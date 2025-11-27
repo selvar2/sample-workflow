@@ -8,6 +8,9 @@ This repository demonstrates automated workflows using ServiceNow MCP (Model Con
 - 🗄️ **AWS Redshift Integration** - Execute database operations via MCP server
 - 🤖 **Automated Workflows** - End-to-end automation from incident creation to task completion
 - 🐳 **Dev Container Ready** - Zero-configuration development environment
+- ✅ **Auto-Verification** - Scripts to verify installation on codespace startup
+
+**Note:** MCP servers are started on-demand by MCP clients (like Claude Desktop), not as background services. In Codespaces, you use the tools directly via Python scripts. See [MCP Architecture](.devcontainer/MCP_ARCHITECTURE.md) for details.
 
 ## Quick Start
 
@@ -24,9 +27,15 @@ Set up GitHub Codespaces secrets (see `.devcontainer/SECRETS_SETUP.md`):
 
 1. Click "Code" → "Codespaces" → "Create codespace on main"
 2. Wait for automatic setup to complete (~2-3 minutes)
-3. Everything is pre-installed and ready to use!
+3. Verification runs automatically - everything is pre-installed and ready!
 
 ```bash
+# Verify installation (runs automatically on setup)
+bash .devcontainer/verify-mcp-setup.sh
+
+# Test MCP servers are ready
+bash .devcontainer/test-mcp-servers.sh
+
 # Activate the environment (already done by default)
 activate-sn
 

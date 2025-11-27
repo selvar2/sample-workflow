@@ -27,6 +27,10 @@ The dev container automatically sets up:
 - ServiceNow MCP server (local installation)
 - AWS Redshift MCP server (via uvx)
 
+**Important:** MCP servers are started **on-demand** by MCP clients (like Claude Desktop), not as background services. In Codespaces, you use the tools directly via Python scripts or AWS CLI. The servers don't need to "run" - they're libraries that are ready to be invoked.
+
+For details, see [MCP_ARCHITECTURE.md](./MCP_ARCHITECTURE.md).
+
 ### VS Code Extensions
 - Python
 - Pylance (Python language server)
@@ -54,6 +58,12 @@ Set these as GitHub Codespaces secrets or local environment variables:
 Once the codespace is created:
 
 ```bash
+# Verify everything is installed correctly
+bash .devcontainer/verify-mcp-setup.sh
+
+# Test MCP servers are ready
+bash .devcontainer/test-mcp-servers.sh
+
 # Activate the ServiceNow MCP environment
 activate-sn
 

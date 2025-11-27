@@ -147,3 +147,9 @@ echo "  - read-incident    : Read incident details"
 echo "  - update-incident  : Update incident with notes"
 echo ""
 echo "🚀 Ready to go! Run 'activate-sn' to start working."
+echo ""
+
+# Run verification
+echo "🔍 Running installation verification..."
+echo ""
+bash /workspaces/sample-workflow/.devcontainer/verify-mcp-setup.sh
