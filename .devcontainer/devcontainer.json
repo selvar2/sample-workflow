@@ -32,6 +32,7 @@
   },
 
   "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "cd /workspaces/sample-workflow/servicenow-mcp && [ -d .venv ] && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . || true",
   
   "remoteEnv": {
     "SERVICENOW_INSTANCE_URL": "${localEnv:SERVICENOW_INSTANCE_URL}",
