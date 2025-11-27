@@ -38,7 +38,6 @@ env/
 Thumbs.db
 
 # Project specific
-servicenow-mcp/
 .env
 .env.local
 *.log
