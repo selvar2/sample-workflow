@@ -81,6 +81,29 @@ The following aliases are automatically configured:
 - `read-incident` - Read incident details
 - `update-incident` - Update incident with notes
 
+## MCP Server Management (Testing/Debugging Only)
+
+**Note:** MCP servers don't need to run as services. These scripts are for testing/debugging only.
+
+### Start Servers in Background
+```bash
+bash .devcontainer/start-mcp-servers-background.sh
+```
+
+### Stop Background Servers
+```bash
+bash .devcontainer/stop-mcp-servers.sh
+```
+
+### Start Server Interactively (foreground)
+```bash
+bash .devcontainer/start-mcp-servers.sh
+```
+
+**Important:** These scripts are for debugging. In normal use:
+- In Codespaces: Call tools directly via Python scripts
+- In Claude Desktop: Servers start automatically on-demand
+
 ## Manual Setup (Not Needed with Dev Container)
 
 If you're not using the dev container, you would need to manually:
