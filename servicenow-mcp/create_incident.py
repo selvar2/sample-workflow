@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """
 Script to create a new incident in ServiceNow.
+Usage: python create_incident.py <short_description> <description>
+Or edit the default values below.
 """
 
 import os
@@ -40,10 +42,19 @@ config_dict = {
 config = ServerConfig(**config_dict)
 auth_manager = AuthManager(config.auth, config.instance_url)
 
+# Get incident details from command line arguments or use defaults
+if len(sys.argv) >= 3:
+    short_description = sys.argv[1]
+    description = sys.argv[2]
+else:
+    # Default values - update these as needed
+    short_description = "Add database user for redshift cluster"
+    description = "Create database user named user10 with password disable in redshift cluster 1"
+
 # Create incident parameters
 params = CreateIncidentParams(
-    short_description="Add database user for redshift cluster",
-    description="Create database user named user9 with password disable in redshift cluster 1"
+    short_description=short_description,
+    description=description
 )
 
 # Create the incident
