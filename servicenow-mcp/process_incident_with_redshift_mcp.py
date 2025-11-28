@@ -111,7 +111,8 @@ check_user_cmd = [
     "--database", database,
     "--db-user", "awsuser",
     "--sql", "SELECT CURRENT_USER, usesuper FROM pg_user WHERE usename = CURRENT_USER;",
-    "--region", "us-east-1"
+    "--region", "us-east-1",
+    "--no-cli-pager"
 ]
 
 try:
@@ -124,7 +125,8 @@ try:
     check_status_cmd = [
         "aws", "redshift-data", "get-statement-result",
         "--id", check_stmt_id,
-        "--region", "us-east-1"
+        "--region", "us-east-1",
+        "--no-cli-pager"
     ]
     check_status_result = subprocess.run(check_status_cmd, capture_output=True, text=True, check=True)
     check_status_response = json.loads(check_status_result.stdout)
@@ -155,7 +157,8 @@ cmd = [
     "--database", database,
     "--db-user", "awsuser",
     "--sql", sql_command,
-    "--region", "us-east-1"
+    "--region", "us-east-1",
+    "--no-cli-pager"
 ]
 
 try:
@@ -177,7 +180,8 @@ try:
         status_cmd = [
             "aws", "redshift-data", "describe-statement",
             "--id", statement_id,
-            "--region", "us-east-1"
+            "--region", "us-east-1",
+            "--no-cli-pager"
         ]
         
         status_result = subprocess.run(status_cmd, capture_output=True, text=True, check=True)

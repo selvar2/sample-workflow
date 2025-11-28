@@ -103,7 +103,8 @@ cmd = [
     "--database", "dev",
     "--db-user", "awsuser",
     "--sql", sql_command,
-    "--region", "us-east-1"
+    "--region", "us-east-1",
+    "--no-cli-pager"
 ]
 
 try:
@@ -119,7 +120,8 @@ try:
         status_cmd = [
             "aws", "redshift-data", "describe-statement",
             "--id", statement_id,
-            "--region", "us-east-1"
+            "--region", "us-east-1",
+            "--no-cli-pager"
         ]
         status_result = subprocess.run(status_cmd, capture_output=True, text=True, check=True)
         status_response = json.loads(status_result.stdout)
