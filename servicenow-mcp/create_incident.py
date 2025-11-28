@@ -42,14 +42,19 @@ config_dict = {
 config = ServerConfig(**config_dict)
 auth_manager = AuthManager(config.auth, config.instance_url)
 
-# Get incident details from command line arguments or use defaults
+# Get incident details from command line arguments
 if len(sys.argv) >= 3:
     short_description = sys.argv[1]
     description = sys.argv[2]
+elif len(sys.argv) == 2:
+    short_description = sys.argv[1]
+    description = "Sample request description"
 else:
-    # Default values - update these as needed
-    short_description = "Add database user for redshift cluster"
-    description = "Create database user named user10 with password disable in redshift cluster 1"
+    print("Usage: python create_incident.py <short_description> <description>")
+    print("Example: python create_incident.py \"Add database user\" \"Create user named user10 in redshift cluster 1\"")
+    print("\nNo arguments provided. Using sample values for demonstration.")
+    short_description = "Sample request"
+    description = "Sample request description"
 
 # Create incident parameters
 params = CreateIncidentParams(
