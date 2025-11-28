@@ -43,7 +43,7 @@ auth_manager = AuthManager(config.auth, config.instance_url)
 # Create incident parameters
 params = CreateIncidentParams(
     short_description="Add database user for redshift cluster",
-    description="Create database user named user11 with password disable in redshift cluster 1"
+    description="Create database user named user9 with password disable in redshift cluster 1"
 )
 
 # Create the incident

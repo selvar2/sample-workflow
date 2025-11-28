@@ -75,6 +75,11 @@ pip install -e .
 echo "📦 Installing additional Python packages..."
 pip install python-dotenv pytest pytest-cov black flake8 mypy
 
+# Ensure python-dotenv is installed (critical dependency)
+echo "📦 Verifying python-dotenv installation..."
+pip install --upgrade python-dotenv
+pip show python-dotenv
+
 # Install AWS CLI (if not already installed via feature)
 if ! command -v aws &> /dev/null; then
     echo "📦 Installing AWS CLI..."
@@ -112,12 +117,15 @@ cat >> ~/.bashrc << 'EOF'
 
 # ServiceNow MCP aliases
 alias activate-sn='cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate'
-alias create-incident='cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate && python create_incident.py'
-alias read-incident='cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate && python read_incident.py'
-alias update-incident='cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate && python update_incident.py'
+alias create-incident='cd /workspaces/sample-workflow/servicenow-mcp && .venv/bin/python create_incident.py'
+alias read-incident='cd /workspaces/sample-workflow/servicenow-mcp && .venv/bin/python read_incident.py'
+alias update-incident='cd /workspaces/sample-workflow/servicenow-mcp && .venv/bin/python update_incident.py'
 
 # Add uv to PATH
 export PATH="$HOME/.cargo/bin:$PATH"
+
+# Auto-activate virtual environment when in servicenow-mcp directory
+cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate
 EOF
 
 # Set up git configuration (if not already configured)

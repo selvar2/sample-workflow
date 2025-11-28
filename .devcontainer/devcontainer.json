@@ -32,7 +32,8 @@
   },
 
   "postCreateCommand": "bash .devcontainer/setup.sh",
-  "postStartCommand": "cd /workspaces/sample-workflow/servicenow-mcp && [ -d .venv ] && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . || true",
+  "postStartCommand": "cd /workspaces/sample-workflow/servicenow-mcp && [ -d .venv ] && (.venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv) || (python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv)",
+  "postAttachCommand": "cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate",
   
   "remoteEnv": {
     "SERVICENOW_INSTANCE_URL": "${localEnv:SERVICENOW_INSTANCE_URL}",

@@ -43,7 +43,7 @@ config = ServerConfig(**config_dict)
 auth_manager = AuthManager(config.auth, config.instance_url)
 
 # Incident number from task 1
-incident_number = "INC0010011"
+incident_number = "INC0010013"
 
 print(f"Processing incident {incident_number}...")
 print("=" * 70)
