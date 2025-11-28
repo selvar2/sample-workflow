@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 """
 Script to process the ServiceNow incident by performing the required database operation.
-This simulates creating a database user in a Redshift cluster based on the incident description.
+This creates a database user in a Redshift cluster based on the incident description.
+Uses awsuser (superuser) for all Redshift operations.
 """
 
 import os
 import sys
+import json
+import time
+import subprocess
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -86,13 +90,65 @@ else:
     print("✗ Could not parse incident description")
     sys.exit(1)
 
-# Step 3: Simulate performing the database operation
-print("\n[Step 3] Performing database operation (simulated)...")
+# Step 3: Execute actual Redshift database operation using awsuser
+print("\n[Step 3] Performing database operation via AWS Redshift Data API...")
+print(f"  → Using awsuser (superuser) for all database operations")
 print(f"  → Connecting to Redshift cluster 'redshift-cluster-{cluster_id}'...")
-print(f"  → Executing: CREATE USER {db_user} WITH NOCREATEDB NOCREATEUSER...")
-print(f"  → Setting password authentication to disabled...")
-print(f"  → Granting standard database privileges...")
-print(f"✓ Database user '{db_user}' created successfully")
+
+# Execute CREATE USER command using awsuser
+sql_command = f"CREATE USER {db_user} PASSWORD DISABLE;"
+cmd = [
+    "aws", "redshift-data", "execute-statement",
+    "--cluster-identifier", f"redshift-cluster-{cluster_id}",
+    "--database", "dev",
+    "--db-user", "awsuser",
+    "--sql", sql_command,
+    "--region", "us-east-1"
+]
+
+try:
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    response = json.loads(result.stdout)
+    statement_id = response['Id']
+    print(f"  → Statement submitted: {statement_id}")
+    
+    # Wait for completion
+    time.sleep(2)
+    max_attempts = 30
+    for attempt in range(max_attempts):
+        status_cmd = [
+            "aws", "redshift-data", "describe-statement",
+            "--id", statement_id,
+            "--region", "us-east-1"
+        ]
+        status_result = subprocess.run(status_cmd, capture_output=True, text=True, check=True)
+        status_response = json.loads(status_result.stdout)
+        status = status_response['Status']
+        
+        if status == 'FINISHED':
+            duration_ms = status_response.get('Duration', 0) / 1000000
+            print(f"✓ Database user '{db_user}' created successfully")
+            print(f"  Duration: {duration_ms:.0f}ms")
+            break
+        elif status == 'FAILED':
+            error = status_response.get('Error', 'Unknown error')
+            print(f"✗ Statement failed: {error}")
+            sys.exit(1)
+        elif status in ['ABORTED', 'CANCELLED']:
+            print(f"✗ Statement was {status.lower()}")
+            sys.exit(1)
+        else:
+            time.sleep(1)
+    else:
+        print("✗ Statement did not complete in time")
+        sys.exit(1)
+        
+except subprocess.CalledProcessError as e:
+    print(f"✗ Failed to execute Redshift command: {e.stderr}")
+    sys.exit(1)
+except json.JSONDecodeError as e:
+    print(f"✗ Failed to parse response: {e}")
+    sys.exit(1)
 
 # Step 4: Update the incident with work notes
 print("\n[Step 4] Updating incident with completion details...")
@@ -106,9 +162,11 @@ Action taken: Created database user '{db_user}' in Redshift cluster 'redshift-cl
 - Database: dev
 - User: {db_user}
 - Password: Disabled (authentication via IAM)
-- Status: User created successfully with standard privileges (no superuser or createdb permissions)
+- Status: User created successfully with standard privileges
+- Statement ID: {statement_id}
+- Executed as: awsuser (superuser)
 
-Verification: User existence confirmed via pg_user system catalog query.
+Verification: User creation confirmed via Redshift Data API.
 Completion timestamp: {completion_time}
 
 MCP Server: ServiceNow MCP v0.1.0
