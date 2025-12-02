@@ -1,0 +1,7 @@
+# Web UI specific requirements
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# These are also in the main requirements.txt
+requests>=2.28.0
+python-dotenv>=1.0.0
