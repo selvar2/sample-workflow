@@ -452,6 +452,96 @@ The repository includes example scripts that demonstrate how to use the tools:
 - **examples/catalog_optimization_example.py**: Demonstrates how to analyze and improve the ServiceNow Service Catalog
 - **examples/change_management_demo.py**: Shows how to create and manage change requests in ServiceNow
 
+#### Incident Listing Utility
+
+The `list_incidents_yesterday.py` script provides a flexible way to query ServiceNow incidents by various date ranges. This utility script allows you to list incidents created within specific time periods without using the MCP server interface.
+
+##### Features
+
+- Query incidents by specific date, week, month, or custom date ranges
+- Direct ServiceNow API integration with proper authentication
+- Comprehensive incident details output
+- Configurable result limits
+
+##### Usage
+
+```bash
+cd servicenow-mcp
+source .venv/bin/activate
+python list_incidents_yesterday.py [OPTIONS]
+```
+
+##### Command Line Options
+
+- `--date YYYY-MM-DD`: List incidents created on a specific date
+- `--week YYYY-MM-DD`: List incidents created in the week containing the specified date (Monday to Sunday)
+- `--month YYYY-MM`: List incidents created in the specified month
+- `--from-date YYYY-MM-DD`: Start date for custom date range
+- `--to-date YYYY-MM-DD`: End date for custom date range
+- `--limit N`: Maximum number of incidents to return (default: 1000)
+
+##### Examples
+
+**List incidents from yesterday:**
+```bash
+python list_incidents_yesterday.py --date 2025-12-01
+```
+
+**List incidents from the past week:**
+```bash
+python list_incidents_yesterday.py --from-date 2025-11-25 --to-date 2025-12-02
+```
+
+**List incidents from a specific month:**
+```bash
+python list_incidents_yesterday.py --month 2025-12
+```
+
+**List incidents from a specific week:**
+```bash
+python list_incidents_yesterday.py --week 2025-12-01
+```
+
+**Limit results to 50 incidents:**
+```bash
+python list_incidents_yesterday.py --month 2025-12 --limit 50
+```
+
+##### Output Format
+
+The script outputs incidents in the following format:
+
+```
+✓ Found N incidents created [description]:
+
+================================================================================
+Number: INC0010020
+Short Description: Add database user for redshift cluster
+State: New
+Priority: 5 - Planning
+Created On: 2025-12-01 06:05:01
+Assigned To: Unassigned
+----------------------------------------
+```
+
+##### Environment Setup
+
+Make sure your `.env` file contains the required ServiceNow credentials:
+
+```bash
+SERVICENOW_INSTANCE_URL=https://your-instance.service-now.com
+SERVICENOW_USERNAME=your-username
+SERVICENOW_PASSWORD=your-password
+```
+
+##### Notes
+
+- The script uses direct ServiceNow REST API calls for accurate date filtering
+- Date ranges are inclusive of the start date and exclusive of the end date
+- Week ranges are calculated as Monday to Sunday
+- All dates should be in YYYY-MM-DD format
+- Months should be in YYYY-MM format
+
 ## Authentication Methods
 
 ### Basic Authentication
