@@ -1,0 +1,35 @@
+# Render.com deployment configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: servicenow-incident-processor
+    runtime: python
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt
+      pip install -r web_ui/requirements.txt
+    startCommand: cd web_ui && gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 120 app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: SERVICENOW_INSTANCE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: SERVICENOW_USERNAME
+        sync: false
+      - key: SERVICENOW_PASSWORD
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: REDSHIFT_DATABASE
+        value: dev
+      - key: REDSHIFT_DB_USER
+        value: awsuser
+      - key: DRY_RUN
+        value: "false"
+    healthCheckPath: /api/status
+    autoDeploy: true
