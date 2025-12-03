@@ -113,10 +113,23 @@ def get_config():
 @app.route('/api/status')
 def get_status():
     """Get current system status."""
-    # Get last activity time from most recent processed incident
-    last_activity = None
-    if state.processed_incidents:
-        last_activity = state.processed_incidents[0].get('timestamp')
+    # Calculate this week's count
+    from datetime import timedelta
+    now = datetime.now()
+    # Start of week (Monday)
+    start_of_week = now - timedelta(days=now.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    this_week_count = 0
+    for incident in state.processed_incidents:
+        ts = incident.get('timestamp')
+        if ts:
+            try:
+                incident_time = datetime.fromisoformat(ts.replace('Z', '+00:00').replace('+00:00', ''))
+                if incident_time >= start_of_week:
+                    this_week_count += 1
+            except:
+                pass
     
     return jsonify({
         "monitoring_active": state.monitoring_active,
@@ -125,7 +138,7 @@ def get_status():
         "success_count": state.success_count,
         "error_count": state.error_count,
         "dry_run": state.dry_run,
-        "last_activity": last_activity
+        "this_week_count": this_week_count
     })
 
 
