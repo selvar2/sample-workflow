@@ -296,6 +296,46 @@
             border-bottom: 2px solid var(--primary-color);
         }
 
+        /* Pagination Styles */
+        .pagination {
+            margin: 0;
+        }
+        
+        .pagination .page-item .page-link {
+            background: var(--darker-bg);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+            padding: 0.35rem 0.65rem;
+            font-size: 0.85rem;
+            min-width: 32px;
+            text-align: center;
+        }
+        
+        .pagination .page-item .page-link:hover {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        
+        .pagination .page-item.active .page-link {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        
+        .pagination .page-item.disabled .page-link {
+            background: var(--darker-bg);
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+        
+        .card-footer {
+            background: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+        }
+
         .spinner-container {
             display: flex;
             justify-content: center;
@@ -577,9 +617,9 @@
                                         <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                                     </button>
                                 </div>
-                                <div class="table-responsive">
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                                     <table class="table table-hover mb-0" id="incidentsTable">
-                                        <thead>
+                                        <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 1;">
                                             <tr>
                                                 <th style="width: 40px;">
                                                     <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()">
@@ -594,6 +634,14 @@
                                         <tbody id="incidentsBody">
                                         </tbody>
                                     </table>
+                                </div>
+                                <!-- Pagination for Incidents -->
+                                <div class="card-footer d-flex justify-content-between align-items-center" id="incidentsPagination">
+                                    <small class="text-secondary" id="incidentsPageInfo">Showing 0 of 0 incidents</small>
+                                    <nav aria-label="Incidents pagination">
+                                        <ul class="pagination pagination-sm mb-0" id="incidentsPaginationList">
+                                        </ul>
+                                    </nav>
                                 </div>
                             </div>
                         </div>
@@ -613,9 +661,9 @@
                                     <i class="bi bi-clock"></i>
                                     <p>No processing history yet</p>
                                 </div>
-                                <div class="table-responsive">
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                                     <table class="table table-hover mb-0" id="historyTable">
-                                        <thead>
+                                        <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 1;">
                                             <tr>
                                                 <th>Timestamp</th>
                                                 <th>Incident</th>
@@ -627,6 +675,14 @@
                                         <tbody id="historyBody">
                                         </tbody>
                                     </table>
+                                </div>
+                                <!-- Pagination for History -->
+                                <div class="card-footer d-flex justify-content-between align-items-center" id="historyPagination">
+                                    <small class="text-secondary" id="historyPageInfo">Showing 0 of 0 records</small>
+                                    <nav aria-label="History pagination">
+                                        <ul class="pagination pagination-sm mb-0" id="historyPaginationList">
+                                        </ul>
+                                    </nav>
                                 </div>
                             </div>
                         </div>
@@ -720,6 +776,11 @@
         let currentIncident = null;
         let eventSource = null;
         let monitoringActive = false;
+        
+        // Pagination state
+        const ITEMS_PER_PAGE = 10;
+        let incidentsCurrentPage = 1;
+        let historyCurrentPage = 1;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -822,6 +883,7 @@
                 }
                 
                 incidents = data.incidents;
+                incidentsCurrentPage = 1; // Reset to first page when loading new data
                 renderIncidents();
                 addLog(`Loaded ${incidents.length} incidents from ServiceNow`, 'info');
             } catch (error) {
@@ -835,7 +897,14 @@
             const body = document.getElementById('incidentsBody');
             body.innerHTML = '';
             
-            incidents.forEach(inc => {
+            // Calculate pagination
+            const totalItems = incidents.length;
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            const startIndex = (incidentsCurrentPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+            const pageIncidents = incidents.slice(startIndex, endIndex);
+            
+            pageIncidents.forEach(inc => {
                 const row = document.createElement('tr');
                 row.className = 'incident-row';
                 
@@ -881,6 +950,66 @@
                 `;
                 body.appendChild(row);
             });
+            
+            // Update pagination info and controls
+            updatePagination('incidents', totalItems, totalPages, incidentsCurrentPage);
+        }
+        
+        function updatePagination(type, totalItems, totalPages, currentPage) {
+            const pageInfo = document.getElementById(`${type}PageInfo`);
+            const paginationList = document.getElementById(`${type}PaginationList`);
+            
+            // Update info text
+            const startItem = totalItems === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
+            const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+            pageInfo.textContent = `Showing ${startItem}-${endItem} of ${totalItems} ${type === 'incidents' ? 'incidents' : 'records'}`;
+            
+            // Build pagination controls
+            paginationList.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            // Previous button
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage('${type}', ${currentPage - 1}); return false;">←</a>`;
+            paginationList.appendChild(prevLi);
+            
+            // Page numbers
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                li.innerHTML = `<a class="page-link" href="#" onclick="changePage('${type}', ${i}); return false;">${i}</a>`;
+                paginationList.appendChild(li);
+            }
+            
+            // Next button
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage('${type}', ${currentPage + 1}); return false;">→</a>`;
+            paginationList.appendChild(nextLi);
+        }
+        
+        function changePage(type, page) {
+            if (type === 'incidents') {
+                const totalPages = Math.ceil(incidents.length / ITEMS_PER_PAGE);
+                if (page < 1 || page > totalPages) return;
+                incidentsCurrentPage = page;
+                renderIncidents();
+            } else if (type === 'history') {
+                const totalPages = Math.ceil(historyData.length / ITEMS_PER_PAGE);
+                if (page < 1 || page > totalPages) return;
+                historyCurrentPage = page;
+                renderHistory();
+            }
         }
 
         function toggleIncidentSelection(incidentNumber) {
@@ -1247,9 +1376,11 @@
         }
 
         // History Functions
+        let historyData = []; // Store all history data for pagination
+        
         async function loadHistory() {
             try {
-                const response = await fetch('/api/history');
+                const response = await fetch('/api/history?limit=500'); // Fetch more records
                 const data = await response.json();
                 
                 const body = document.getElementById('historyBody');
@@ -1258,41 +1389,58 @@
                 if (data.history.length === 0) {
                     empty.classList.remove('d-none');
                     body.innerHTML = '';
+                    updatePagination('history', 0, 0, 1);
                     return;
                 }
                 
                 empty.classList.add('d-none');
-                body.innerHTML = '';
-                
-                data.history.forEach(item => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>
-                            <small>${item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}</small>
-                        </td>
-                        <td><strong>${item.incident_number}</strong></td>
-                        <td>
-                            ${item.success 
-                                ? '<span class="badge badge-success">Success</span>'
-                                : '<span class="badge badge-danger">Failed</span>'
-                            }
-                        </td>
-                        <td>
-                            <div class="text-truncate" style="max-width: 300px;" title="${item.message || ''}">
-                                ${item.message || 'N/A'}
-                            </div>
-                        </td>
-                        <td>
-                            <button class="btn btn-outline-light btn-sm" onclick='showHistoryDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
-                                <i class="bi bi-info-circle"></i>
-                            </button>
-                        </td>
-                    `;
-                    body.appendChild(row);
-                });
+                historyData = data.history;
+                renderHistory();
             } catch (error) {
                 console.error('Failed to load history:', error);
             }
+        }
+        
+        function renderHistory() {
+            const body = document.getElementById('historyBody');
+            body.innerHTML = '';
+            
+            // Calculate pagination
+            const totalItems = historyData.length;
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            const startIndex = (historyCurrentPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+            const pageHistory = historyData.slice(startIndex, endIndex);
+            
+            pageHistory.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        <small>${item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}</small>
+                    </td>
+                    <td><strong>${item.incident_number}</strong></td>
+                    <td>
+                        ${item.success 
+                            ? '<span class="badge badge-success">Success</span>'
+                            : '<span class="badge badge-danger">Failed</span>'
+                        }
+                    </td>
+                    <td>
+                        <div class="text-truncate" style="max-width: 300px;" title="${item.message || ''}">
+                            ${item.message || 'N/A'}
+                        </div>
+                    </td>
+                    <td>
+                        <button class="btn btn-outline-light btn-sm" onclick='showHistoryDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                    </td>
+                `;
+                body.appendChild(row);
+            });
+            
+            // Update pagination
+            updatePagination('history', totalItems, totalPages, historyCurrentPage);
         }
 
         function showHistoryDetail(item) {
