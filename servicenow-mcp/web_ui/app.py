@@ -38,17 +38,50 @@ from process_servicenow_redshift import (
 app = Flask(__name__)
 CORS(app)
 
-# Global state
+# ============================================================================
+# Persistent Storage
+# ============================================================================
+
+HISTORY_FILE = os.path.join(os.path.dirname(__file__), 'processing_history.json')
+
+def load_history() -> List[Dict[str, Any]]:
+    """Load processing history from file."""
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load history file: {e}")
+    return []
+
+def save_history(history: List[Dict[str, Any]]):
+    """Save processing history to file."""
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(history[:500], f, indent=2)  # Keep last 500 entries
+    except Exception as e:
+        print(f"Warning: Could not save history file: {e}")
+
+def add_to_history(result: Dict[str, Any]):
+    """Add a result to history and persist it."""
+    result["timestamp"] = datetime.now().isoformat()
+    state.processed_incidents.insert(0, result)
+    save_history(state.processed_incidents)
+
+# ============================================================================
+# Global State
+# ============================================================================
+
 class AppState:
     def __init__(self):
         self.monitoring_active = False
         self.monitor_thread = None
-        self.processed_incidents: List[Dict[str, Any]] = []
+        self.processed_incidents: List[Dict[str, Any]] = load_history()  # Load from file
         self.event_queue = queue.Queue()
         self.last_poll_time = None
         self.poll_count = 0
         self.error_count = 0
-        self.success_count = 0
+        self.success_count = len([h for h in self.processed_incidents if h.get('success')])
         self.dry_run = os.getenv("DRY_RUN", "false").lower() == "true"
         
 state = AppState()
@@ -160,9 +193,8 @@ def process_incident(incident_number: str):
         processor = IncidentProcessor(dry_run=dry_run)
         result = processor.process_incident(incident_number)
         
-        # Store in history
-        result["timestamp"] = datetime.now().isoformat()
-        state.processed_incidents.insert(0, result)
+        # Store in history (persistent)
+        add_to_history(result)
         
         # Update counters
         if result["success"]:
@@ -292,8 +324,7 @@ def start_monitoring():
                     processed_in_session.add(inc_number)
                     
                     result = processor.process_incident(inc_number)
-                    result["timestamp"] = datetime.now().isoformat()
-                    state.processed_incidents.insert(0, result)
+                    add_to_history(result)  # Persistent storage
                     
                     if result["success"]:
                         state.success_count += 1
@@ -425,6 +456,9 @@ def clear_history():
     state.success_count = 0
     state.error_count = 0
     state.poll_count = 0
+    
+    # Clear persistent storage
+    save_history([])
     
     return jsonify({
         "success": True,
