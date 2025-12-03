@@ -180,7 +180,7 @@ class ServiceNowClient:
 # ============================================================================
 
 class RedshiftClient:
-    """Client for AWS Redshift Data API operations."""
+    """Client for AWS Redshift Data API operations using boto3."""
     
     def __init__(self, cluster_name: str, dry_run: bool = False):
         self.cluster_name = cluster_name
@@ -188,6 +188,15 @@ class RedshiftClient:
         self.db_user = Config.REDSHIFT_DB_USER
         self.region = Config.AWS_REGION
         self.dry_run = dry_run
+        self._client = None
+    
+    @property
+    def client(self):
+        """Lazy-load boto3 client."""
+        if self._client is None:
+            import boto3
+            self._client = boto3.client('redshift-data', region_name=self.region)
+        return self._client
     
     def _execute_statement(self, sql: str) -> Tuple[bool, str, Optional[str]]:
         """Execute a SQL statement via AWS Redshift Data API."""
@@ -195,25 +204,17 @@ class RedshiftClient:
             logger.info(f"[DRY RUN] Would execute: {sql}")
             return True, "dry-run-statement-id", None
         
-        cmd = [
-            "aws", "redshift-data", "execute-statement",
-            "--cluster-identifier", self.cluster_name,
-            "--database", self.database,
-            "--db-user", self.db_user,
-            "--sql", sql,
-            "--region", self.region,
-            "--no-cli-pager"
-        ]
-        
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            response = json.loads(result.stdout)
+            response = self.client.execute_statement(
+                ClusterIdentifier=self.cluster_name,
+                Database=self.database,
+                DbUser=self.db_user,
+                Sql=sql
+            )
             statement_id = response.get("Id")
             return True, statement_id, None
-        except subprocess.CalledProcessError as e:
-            return False, None, f"Command failed: {e.stderr}"
-        except json.JSONDecodeError as e:
-            return False, None, f"Failed to parse response: {e}"
+        except Exception as e:
+            return False, None, f"Execute statement failed: {str(e)}"
     
     def _wait_for_statement(self, statement_id: str, timeout: int = 60) -> Tuple[str, Optional[str]]:
         """Wait for a statement to complete and return its status."""
@@ -222,16 +223,8 @@ class RedshiftClient:
         
         start_time = time.time()
         while time.time() - start_time < timeout:
-            cmd = [
-                "aws", "redshift-data", "describe-statement",
-                "--id", statement_id,
-                "--region", self.region,
-                "--no-cli-pager"
-            ]
-            
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-                response = json.loads(result.stdout)
+                response = self.client.describe_statement(Id=statement_id)
                 status = response.get("Status")
                 
                 if status == "FINISHED":
@@ -252,16 +245,9 @@ class RedshiftClient:
         if self.dry_run:
             return {"Records": [], "TotalNumRows": 0}
         
-        cmd = [
-            "aws", "redshift-data", "get-statement-result",
-            "--id", statement_id,
-            "--region", self.region,
-            "--no-cli-pager"
-        ]
-        
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            return json.loads(result.stdout)
+            response = self.client.get_statement_result(Id=statement_id)
+            return response
         except Exception as e:
             logger.error(f"Failed to get statement result: {e}")
             return None
