@@ -127,7 +127,7 @@ class ServiceNowClient:
     def list_incidents(self, from_date: str, limit: int = 100) -> list:
         """List incidents created on or after a specific date."""
         url = f"{self.base_url}/api/now/table/incident"
-        query = f"sys_created_on>={from_date}^ORDERBYsys_created_on"
+        query = f"sys_created_on>={from_date}^ORDERBYDESCsys_created_on"
         params = {
             "sysparm_query": query,
             "sysparm_limit": limit,
