@@ -52,22 +52,46 @@ pip install flask flask-cors
 
 ### Running the Web UI
 
-**Option 1: Using the startup script**
+**Option 1: Local Development (default)**
+```bash
+cd servicenow-mcp/web_ui
+python run_server.py
+```
+
+**Option 2: Public Access via ngrok**
+```bash
+cd servicenow-mcp/web_ui
+python run_server.py --public
+```
+This creates a public URL that anyone can access from the internet.
+
+**Option 3: GitHub Codespaces Port Forwarding**
+```bash
+# Show instructions
+python run_server.py --codespaces
+```
+Or manually:
+1. Start the server: `python app.py`
+2. Go to PORTS tab in VS Code
+3. Right-click port 5000 → Port Visibility → Public
+4. Copy the public URL (e.g., `https://xxx-5000.app.github.dev`)
+
+**Option 4: Production with Gunicorn**
+```bash
+cd servicenow-mcp/web_ui
+python run_server.py --production --workers 4
+```
+
+**Option 5: Custom host/port**
+```bash
+python run_server.py --host 0.0.0.0 --port 8080
+```
+
+**Option 6: Using the startup script**
 ```bash
 cd servicenow-mcp
 chmod +x web_ui/run_web_ui.sh
 ./web_ui/run_web_ui.sh
-```
-
-**Option 2: Direct Python execution**
-```bash
-cd servicenow-mcp
-python web_ui/app.py
-```
-
-**Option 3: With custom port**
-```bash
-WEB_UI_PORT=8080 python web_ui/app.py
 ```
 
 The web UI will be available at `http://localhost:5000` (or your custom port).
