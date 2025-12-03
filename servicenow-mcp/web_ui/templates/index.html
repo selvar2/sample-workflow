@@ -1355,8 +1355,14 @@
             eventSource = new EventSource('/api/events');
             
             eventSource.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                handleEvent(data);
+                try {
+                    if (event.data && event.data.trim()) {
+                        const data = JSON.parse(event.data);
+                        handleEvent(data);
+                    }
+                } catch (e) {
+                    console.log('SSE parse error:', e.message, 'Data:', event.data);
+                }
             };
             
             eventSource.onerror = () => {

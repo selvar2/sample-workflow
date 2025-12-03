@@ -354,11 +354,19 @@ def events():
         while True:
             try:
                 event = state.event_queue.get(timeout=30)
-                yield f"data: {json.dumps(event)}\n\n"
+                data = json.dumps(event)
+                yield f"data: {data}\n\n"
             except queue.Empty:
+                # Send heartbeat to keep connection alive
                 yield f"data: {json.dumps({'type': 'heartbeat', 'data': {}})}\n\n"
+            except Exception as e:
+                # Log error but don't break the connection
+                yield f"data: {json.dumps({'type': 'error', 'data': {'message': str(e)}})}\n\n"
     
-    return Response(generate(), mimetype='text/event-stream')
+    response = Response(generate(), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['X-Accel-Buffering'] = 'no'
+    return response
 
 
 @app.route('/api/test-connection')
