@@ -113,14 +113,19 @@ def get_config():
 @app.route('/api/status')
 def get_status():
     """Get current system status."""
+    # Get last activity time from most recent processed incident
+    last_activity = None
+    if state.processed_incidents:
+        last_activity = state.processed_incidents[0].get('timestamp')
+    
     return jsonify({
         "monitoring_active": state.monitoring_active,
         "last_poll_time": state.last_poll_time.isoformat() if state.last_poll_time else None,
-        "poll_count": state.poll_count,
         "processed_count": len(state.processed_incidents),
         "success_count": state.success_count,
         "error_count": state.error_count,
-        "dry_run": state.dry_run
+        "dry_run": state.dry_run,
+        "last_activity": last_activity
     })
 
 

@@ -454,8 +454,8 @@
             </div>
             <div class="col-lg-3 col-md-6">
                 <div class="card stat-card warning">
-                    <div class="stat-value" id="statPolls">0</div>
-                    <div class="stat-label">Poll Count</div>
+                    <div class="stat-value" id="statLastActivity" style="font-size: 1.2rem;">--</div>
+                    <div class="stat-label">Last Activity</div>
                 </div>
             </div>
         </div>
@@ -798,6 +798,30 @@
             connectEventSource();
         });
 
+        // Helper function for last activity
+        function updateLastActivity(timestamp) {
+            const el = document.getElementById('statLastActivity');
+            if (!timestamp) {
+                el.textContent = '--';
+                return;
+            }
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins < 1) {
+                el.textContent = 'Just now';
+            } else if (diffMins < 60) {
+                el.textContent = `${diffMins}m ago`;
+            } else if (diffMins < 1440) {
+                el.textContent = `${Math.floor(diffMins / 60)}h ago`;
+            } else {
+                el.textContent = date.toLocaleDateString();
+            }
+            el.title = date.toLocaleString();
+        }
+
         // API Functions
         async function loadConfig() {
             try {
@@ -822,7 +846,7 @@
                 document.getElementById('statTotal').textContent = status.processed_count;
                 document.getElementById('statSuccess').textContent = status.success_count;
                 document.getElementById('statErrors').textContent = status.error_count;
-                document.getElementById('statPolls').textContent = status.poll_count;
+                updateLastActivity(status.last_activity);
                 
                 updateMonitoringUI(status.monitoring_active);
             } catch (error) {
@@ -1531,7 +1555,7 @@
                     
                 case 'poll_complete':
                     if (event.data.new_incidents > 0) {
-                        addLog(`Poll #${event.data.poll_count}: Found ${event.data.new_incidents} new incident(s)`, 'info');
+                        addLog(`Found ${event.data.new_incidents} new incident(s)`, 'info');
                     }
                     loadStatus();
                     break;
