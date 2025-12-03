@@ -285,7 +285,14 @@ class RedshiftClient:
         return False, statement_id
     
     def create_user(self, username: str) -> Tuple[bool, str, Optional[str]]:
-        """Create a new user with password disabled."""
+        """Create a new user with password disabled.
+        
+        Returns:
+            Tuple of (success, statement_id, error_or_info)
+            - If user is created: (True, statement_id, None)
+            - If user already exists: (True, statement_id, "USER_EXISTS")
+            - If other error: (False, statement_id, error_message)
+        """
         sql = f"CREATE USER {username} PASSWORD DISABLE;"
         
         success, statement_id, error = self._execute_statement(sql)
@@ -294,6 +301,10 @@ class RedshiftClient:
         
         status, error = self._wait_for_statement(statement_id)
         if status != "FINISHED":
+            # Check if the error is because user already exists
+            if error and "already exists" in error.lower():
+                logger.info(f"User '{username}' already exists in the database")
+                return True, statement_id, "USER_EXISTS"
             return False, statement_id, error
         
         return True, statement_id, None
@@ -524,17 +535,25 @@ class IncidentProcessor:
         
         # Create user
         logger.info(f"Creating user '{username}' in {cluster}...")
-        success, statement_id, error = redshift.create_user(username)
+        success, statement_id, error_or_info = redshift.create_user(username)
         result["statements"].append({
             "operation": "CREATE_USER",
             "statement_id": statement_id,
             "sql": f"CREATE USER {username} PASSWORD DISABLE;",
             "success": success,
-            "error": error
+            "error": error_or_info if error_or_info != "USER_EXISTS" else None
         })
         
+        # Check if user already existed (detected during CREATE attempt)
+        if success and error_or_info == "USER_EXISTS":
+            result["user_existed"] = True
+            result["success"] = True
+            result["message"] = f"Database user verification completed. User '{username}' already exists in {cluster}. No further action required."
+            logger.info(result["message"])
+            return result
+        
         if not success:
-            result["message"] = f"Failed to create user: {error}"
+            result["message"] = f"Failed to create user: {error_or_info}"
             logger.error(result["message"])
             return result
         
