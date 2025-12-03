@@ -95,7 +95,7 @@ def get_status():
 def list_incidents():
     """List recent incidents from ServiceNow."""
     from_date = request.args.get('from_date', datetime.now().strftime("%Y-%m-%d"))
-    limit = int(request.args.get('limit', 20))
+    limit = int(request.args.get('limit', 100))
     
     try:
         client = ServiceNowClient()

@@ -871,7 +871,7 @@
             body.innerHTML = '';
             
             try {
-                const response = await fetch(`/api/incidents?from_date=${fromDate}`);
+                const response = await fetch(`/api/incidents?from_date=${fromDate}&limit=100`);
                 const data = await response.json();
                 
                 loading.classList.add('d-none');
