@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - ServiceNow Incident Processor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-glow: rgba(37, 99, 235, 0.4);
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-bg: #1e293b;
+            --darker-bg: #0f172a;
+            --darkest-bg: #020617;
+            --card-bg: rgba(30, 41, 59, 0.8);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-color: #334155;
+            --border-light: rgba(148, 163, 184, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--darkest-bg);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Animated background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 20% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 40%),
+                        radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+            animation: bgRotate 30s linear infinite;
+        }
+
+        @keyframes bgRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Grid pattern overlay */
+        .grid-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 1;
+        }
+
+        /* Floating particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: float 15s infinite ease-in-out;
+        }
+
+        .particle:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; }
+        .particle:nth-child(2) { left: 20%; top: 80%; animation-delay: 2s; }
+        .particle:nth-child(3) { left: 60%; top: 40%; animation-delay: 4s; }
+        .particle:nth-child(4) { left: 80%; top: 60%; animation-delay: 6s; }
+        .particle:nth-child(5) { left: 30%; top: 50%; animation-delay: 8s; }
+        .particle:nth-child(6) { left: 70%; top: 25%; animation-delay: 10s; }
+        .particle:nth-child(7) { left: 90%; top: 85%; animation-delay: 12s; }
+        .particle:nth-child(8) { left: 5%; top: 70%; animation-delay: 14s; }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+            25% { transform: translateY(-20px) translateX(10px); opacity: 0.6; }
+            50% { transform: translateY(-40px) translateX(-10px); opacity: 0.3; }
+            75% { transform: translateY(-20px) translateX(10px); opacity: 0.6; }
+        }
+
+        /* Login container */
+        .login-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            padding: 20px;
+        }
+
+        /* Logo and branding */
+        .brand-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .brand-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #8b5cf6 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 20px 40px -10px var(--primary-glow);
+            animation: logoFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .brand-logo i {
+            font-size: 2.5rem;
+            color: white;
+        }
+
+        .brand-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Login card */
+        .login-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-light);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .login-header p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Form styles */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            transition: color 0.3s ease;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.875rem 1rem 0.875rem 3rem;
+            font-size: 1rem;
+            font-family: inherit;
+            background: var(--darker-bg) !important;
+            background-color: var(--darker-bg) !important;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            transition: all 0.3s ease;
+            caret-color: #ffffff !important;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: var(--dark-bg) !important;
+            background-color: var(--dark-bg) !important;
+            box-shadow: 0 0 0 4px var(--primary-glow);
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+
+        .form-control:focus + i,
+        .form-control:focus ~ i {
+            color: var(--primary-color);
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted) !important;
+            -webkit-text-fill-color: var(--text-muted) !important;
+            opacity: 1;
+        }
+
+        /* Ensure input text is always visible */
+        .form-control:not(:placeholder-shown) {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+        }
+
+        /* Override Bootstrap and browser defaults */
+        input.form-control,
+        input[type="text"],
+        input[type="password"],
+        .login-card input {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            background-color: #0f172a !important;
+        }
+
+        .login-card input:focus {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            background-color: #1e293b !important;
+        }
+
+        /* Password toggle */
+        .password-toggle {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            transition: color 0.3s ease;
+        }
+
+        .password-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        /* Remember me & forgot password */
+        .form-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .remember-me input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .remember-me span {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .forgot-password {
+            font-size: 0.875rem;
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .forgot-password:hover {
+            color: var(--primary-hover);
+            text-decoration: underline;
+        }
+
+        /* Login button */
+        .btn-login {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-login::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px -10px var(--primary-glow);
+        }
+
+        .btn-login:hover::before {
+            left: 100%;
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-login .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .btn-login.loading .spinner {
+            display: block;
+        }
+
+        .btn-login.loading .btn-text {
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error message */
+        .alert {
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .alert-danger i {
+            color: var(--danger-color);
+            font-size: 1.25rem;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #6ee7b7;
+        }
+
+        .alert-success i {
+            color: var(--success-color);
+            font-size: 1.25rem;
+        }
+
+        /* Footer */
+        .login-footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .login-footer p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .login-footer .highlight {
+            color: var(--text-secondary);
+        }
+
+        /* Security badge */
+        .security-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .security-badge i {
+            color: var(--success-color);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 15px;
+            }
+
+            .login-card {
+                padding: 1.5rem;
+            }
+
+            .brand-logo {
+                width: 60px;
+                height: 60px;
+            }
+
+            .brand-logo i {
+                font-size: 1.75rem;
+            }
+
+            .brand-title {
+                font-size: 1.5rem;
+            }
+
+            .form-options {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+        }
+
+        /* Input autofill styling */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus {
+            -webkit-text-fill-color: #ffffff !important;
+            -webkit-box-shadow: 0 0 0px 1000px var(--darker-bg) inset !important;
+            transition: background-color 5000s ease-in-out 0s;
+            color: #ffffff !important;
+            caret-color: #ffffff !important;
+        }
+
+        /* Firefox autofill */
+        input:autofill {
+            background: var(--darker-bg) !important;
+            color: #ffffff !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated background -->
+    <div class="bg-animation"></div>
+    <div class="grid-overlay"></div>
+    
+    <!-- Floating particles -->
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <div class="login-container">
+        <!-- Brand section -->
+        <div class="brand-section">
+            <div class="brand-logo">
+                <i class="bi bi-gear-wide-connected"></i>
+            </div>
+            <h1 class="brand-title">ServiceNow Processor</h1>
+            <p class="brand-subtitle">Automated Incident & Redshift Management</p>
+        </div>
+
+        <!-- Login card -->
+        <div class="login-card">
+            <div class="login-header">
+                <h2>Welcome Back</h2>
+                <p>Sign in to access your dashboard</p>
+            </div>
+
+            <!-- Error/Success message -->
+            {% if error %}
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-circle"></i>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            {% if message %}
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle"></i>
+                <span>{{ message }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Login form -->
+            <form id="loginForm" method="POST" action="/login">
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="username" 
+                            name="username" 
+                            placeholder="Enter your username"
+                            autocomplete="username"
+                            required
+                            style="color: #ffffff; -webkit-text-fill-color: #ffffff; background-color: #1e3a5f; border: 2px solid #3b82f6;"
+                        >
+                        <i class="bi bi-person"></i>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="password" 
+                            class="form-control" 
+                            id="password" 
+                            name="password" 
+                            placeholder="Enter your password"
+                            autocomplete="current-password"
+                            required
+                            style="color: #ffffff; -webkit-text-fill-color: #ffffff; background-color: #1e3a5f; border: 2px solid #3b82f6;"
+                        >
+                        <i class="bi bi-lock"></i>
+                        <button type="button" class="password-toggle" onclick="togglePassword()">
+                            <i class="bi bi-eye" id="toggleIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox" name="remember" id="remember">
+                        <span>Remember me</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <span class="spinner"></span>
+                    <span class="btn-text">
+                        <i class="bi bi-box-arrow-in-right"></i>
+                        Sign In
+                    </span>
+                </button>
+            </form>
+
+            <div class="security-badge">
+                <i class="bi bi-shield-check"></i>
+                <span>Secure authentication with session management</span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="login-footer">
+            <p>
+                <span class="highlight">ServiceNow Incident Processor</span> • 
+                Connected to MCP Services
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Toggle password visibility
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.classList.remove('bi-eye');
+                toggleIcon.classList.add('bi-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.classList.remove('bi-eye-slash');
+                toggleIcon.classList.add('bi-eye');
+            }
+        }
+
+        // Form submission with loading state
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const btn = document.getElementById('loginBtn');
+            btn.classList.add('loading');
+            btn.disabled = true;
+        });
+
+        // Focus first input on load
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('username').focus();
+        });
+
+        // Handle Enter key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const form = document.getElementById('loginForm');
+                if (form.checkValidity()) {
+                    form.submit();
+                }
+            }
+        });
+
+        // Clear form on every page load (security measure)
+        function clearLoginForm() {
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('rememberMe').checked = false;
+            // Reset button state
+            const btn = document.getElementById('loginBtn');
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+
+        // Check authentication status with server
+        async function checkAuthStatus() {
+            try {
+                // Add cache-busting parameter to force fresh request
+                const response = await fetch('/api/auth/status?t=' + Date.now(), {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                const data = await response.json();
+                return data.authenticated === true;
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                return false;
+            }
+        }
+
+        // Handle page visibility and navigation
+        async function handlePageLoad(isFromCache) {
+            // Always clear form first for security
+            clearLoginForm();
+            
+            // Check if user has a valid session
+            const isAuthenticated = await checkAuthStatus();
+            
+            if (isAuthenticated) {
+                // User has valid session, redirect to dashboard
+                console.log('User already authenticated, redirecting to dashboard');
+                window.location.replace('/');
+            } else {
+                // User not authenticated, stay on login page
+                console.log('User not authenticated, staying on login page');
+                // Focus username field
+                document.getElementById('username').focus();
+            }
+        }
+
+        // Run on initial page load
+        document.addEventListener('DOMContentLoaded', function() {
+            handlePageLoad(false);
+        });
+
+        // Handle back/forward button (bfcache)
+        window.addEventListener('pageshow', function(event) {
+            // Always run check, especially if page was cached
+            handlePageLoad(event.persisted);
+        });
+
+        // Handle tab visibility change
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                handlePageLoad(true);
+            }
+        });
+    </script>
+</body>
+</html>

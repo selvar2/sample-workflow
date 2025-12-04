@@ -1,2 +1,6 @@
 # Processing history (persistent storage)
 processing_history.json
+
+# User credentials (should never be in repo)
+users.json
+*.credentials

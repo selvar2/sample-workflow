@@ -427,6 +427,90 @@
                 transform: rotate(90deg);
             }
         }
+
+        /* Dropdown menu styles */
+        .dropdown-menu-dark {
+            background: var(--dark-bg);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .dropdown-menu-dark .dropdown-item {
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            transition: background 0.2s;
+        }
+
+        .dropdown-menu-dark .dropdown-item:hover {
+            background: var(--border-color);
+        }
+
+        .dropdown-menu-dark .dropdown-item.text-danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .dropdown-menu-dark .dropdown-item-text {
+            padding: 0.5rem 1rem;
+        }
+
+        .dropdown-menu-dark .dropdown-divider {
+            border-color: var(--border-color);
+        }
+
+        /* User menu button */
+        #userMenuBtn {
+            border-color: var(--border-color);
+        }
+
+        #userMenuBtn:hover {
+            background: var(--border-color);
+        }
+
+        /* Session expired overlay */
+        .session-expired-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .session-expired-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            max-width: 400px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .session-expired-card i {
+            font-size: 3rem;
+            color: var(--warning-color);
+            margin-bottom: 1rem;
+        }
+
+        .session-expired-card h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .session-expired-card p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
     </style>
 </head>
 <body>
@@ -445,6 +529,27 @@
                 <button class="btn btn-outline-light btn-sm" onclick="testConnections()">
                     <i class="bi bi-arrow-clockwise"></i> Test
                 </button>
+                <!-- User Menu -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-light btn-sm dropdown-toggle d-flex align-items-center gap-2" type="button" id="userMenuBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle"></i>
+                        <span id="userDisplayName">{{ user.display_name if user else 'User' }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="userMenuBtn">
+                        <li>
+                            <span class="dropdown-item-text">
+                                <small class="text-secondary">Signed in as</small><br>
+                                <strong id="userUsername">{{ user.username if user else '' }}</strong>
+                            </span>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item text-danger" href="/logout" onclick="return confirmLogout()">
+                                <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
@@ -1628,6 +1733,98 @@
                 document.getElementById(toastId).remove();
             });
         }
+
+        // Logout confirmation
+        function confirmLogout() {
+            return confirm('Are you sure you want to sign out?');
+        }
+
+        // Handle session expiration
+        function handleSessionExpired() {
+            // Check if overlay already exists
+            if (document.querySelector('.session-expired-overlay')) return;
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'session-expired-overlay';
+            overlay.innerHTML = `
+                <div class="session-expired-card">
+                    <i class="bi bi-shield-lock"></i>
+                    <h4>Session Expired</h4>
+                    <p>Your session has expired. Please sign in again to continue.</p>
+                    <a href="/login" class="btn btn-primary">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                    </a>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // Wrap fetch to handle auth errors
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const response = await originalFetch.apply(this, args);
+            
+            // Check for authentication errors
+            if (response.status === 401) {
+                const data = await response.clone().json().catch(() => ({}));
+                if (data.redirect === '/login') {
+                    handleSessionExpired();
+                }
+            }
+            
+            return response;
+        };
+
+        // Authentication check function with cache busting
+        async function verifyAuthentication() {
+            try {
+                const response = await originalFetch('/api/auth/status?t=' + Date.now(), {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                const data = await response.json();
+                return data.authenticated === true;
+            } catch (error) {
+                console.error('Auth verification failed:', error);
+                return false;
+            }
+        }
+
+        // Handle unauthenticated state
+        async function checkAndRedirectIfUnauthenticated() {
+            const isAuthenticated = await verifyAuthentication();
+            if (!isAuthenticated) {
+                console.log('User not authenticated, redirecting to login');
+                window.location.replace('/login');
+                return false;
+            }
+            return true;
+        }
+
+        // Periodic session check (every 5 minutes)
+        setInterval(checkAndRedirectIfUnauthenticated, 5 * 60 * 1000);
+
+        // Check authentication when page becomes visible (back button fix)
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                await checkAndRedirectIfUnauthenticated();
+            }
+        });
+
+        // Also check on pageshow event (handles back/forward cache)
+        window.addEventListener('pageshow', async (event) => {
+            // Always check, not just when persisted
+            await checkAndRedirectIfUnauthenticated();
+        });
+
+        // Check authentication immediately on page load
+        (async () => {
+            await checkAndRedirectIfUnauthenticated();
+        })();
     </script>
 </body>
 </html>
