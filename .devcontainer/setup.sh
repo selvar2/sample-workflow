@@ -75,6 +75,10 @@ pip install -e .
 echo "📦 Installing additional Python packages..."
 pip install python-dotenv pytest pytest-cov black flake8 mypy
 
+# Install AWS SDK and Web UI dependencies
+echo "📦 Installing boto3 and Flask dependencies..."
+pip install boto3>=1.34.0 flask>=2.3.0 flask-cors>=4.0.0
+
 # Ensure python-dotenv is installed (critical dependency)
 echo "📦 Verifying python-dotenv installation..."
 pip install --upgrade python-dotenv

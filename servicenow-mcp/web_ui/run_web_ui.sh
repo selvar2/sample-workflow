@@ -14,7 +14,7 @@ if [ -d ".venv" ]; then
 fi
 
 # Install web UI dependencies if needed
-pip install flask flask-cors -q
+pip install flask flask-cors boto3 -q
 
 # Set environment variables if not already set
 export FLASK_DEBUG="${FLASK_DEBUG:-false}"
