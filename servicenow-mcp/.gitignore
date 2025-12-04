@@ -181,3 +181,8 @@ cython_debug/
 .env.development
 .env.test
 .env.production
+
+# Sensitive config files (use examples/ for templates)
+claude_desktop_config.json
+users.json
+processing_history.json
