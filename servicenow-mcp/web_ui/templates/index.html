@@ -403,6 +403,15 @@
             background: var(--darker-bg);
             border-radius: 8px;
             min-width: 120px;
+            color: #ffffff;
+        }
+
+        .workflow-step small {
+            color: #ffffff !important;
+        }
+
+        .workflow-step small.text-secondary {
+            color: #94a3b8 !important;
         }
 
         .workflow-step i {
@@ -594,6 +603,12 @@
             </div>
             <div class="card-body">
                 <div class="workflow-diagram">
+                    <div class="workflow-step" id="step0">
+                        <i class="bi bi-person-plus text-purple" style="color: #a855f7 !important;"></i>
+                        <small>User</small>
+                        <small class="text-secondary">Creates Incident</small>
+                    </div>
+                    <i class="bi bi-arrow-right workflow-arrow"></i>
                     <div class="workflow-step" id="step1">
                         <i class="bi bi-inbox text-primary"></i>
                         <small>ServiceNow</small>
@@ -601,24 +616,18 @@
                     </div>
                     <i class="bi bi-arrow-right workflow-arrow"></i>
                     <div class="workflow-step" id="step2">
-                        <i class="bi bi-search text-info"></i>
-                        <small>Detect</small>
-                        <small class="text-secondary">New Incidents</small>
-                    </div>
-                    <i class="bi bi-arrow-right workflow-arrow"></i>
-                    <div class="workflow-step" id="step3">
                         <i class="bi bi-code-square text-warning"></i>
                         <small>Parse</small>
                         <small class="text-secondary">Redshift Commands</small>
                     </div>
                     <i class="bi bi-arrow-right workflow-arrow"></i>
-                    <div class="workflow-step" id="step4">
+                    <div class="workflow-step" id="step3">
                         <i class="bi bi-database text-success"></i>
                         <small>Execute</small>
                         <small class="text-secondary">Redshift MCP</small>
                     </div>
                     <i class="bi bi-arrow-right workflow-arrow"></i>
-                    <div class="workflow-step" id="step5">
+                    <div class="workflow-step" id="step4">
                         <i class="bi bi-check-circle text-success"></i>
                         <small>Update</small>
                         <small class="text-secondary">ServiceNow</small>
