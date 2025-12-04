@@ -218,9 +218,12 @@
 
         .input-wrapper {
             position: relative;
+            display: flex;
+            align-items: center;
         }
 
-        .input-wrapper i {
+        .input-wrapper > i.bi-person,
+        .input-wrapper > i.bi-lock {
             position: absolute;
             left: 1rem;
             top: 50%;
@@ -228,6 +231,8 @@
             color: var(--text-muted);
             font-size: 1.1rem;
             transition: color 0.3s ease;
+            z-index: 5;
+            pointer-events: none;
         }
 
         .form-control {
@@ -245,6 +250,10 @@
             caret-color: #ffffff !important;
         }
 
+        .form-control.has-toggle {
+            padding-right: 3rem;
+        }
+
         .form-control:focus {
             outline: none;
             border-color: var(--primary-color);
@@ -255,8 +264,10 @@
             -webkit-text-fill-color: #ffffff !important;
         }
 
-        .form-control:focus + i,
-        .form-control:focus ~ i {
+        .form-control:focus + i.bi-person,
+        .form-control:focus + i.bi-lock,
+        .form-control:focus ~ i.bi-person,
+        .form-control:focus ~ i.bi-lock {
             color: var(--primary-color);
         }
 
@@ -291,15 +302,23 @@
         /* Password toggle */
         .password-toggle {
             position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 48px;
             background: none;
             border: none;
             color: var(--text-muted);
             cursor: pointer;
-            padding: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: color 0.3s ease;
+            z-index: 10;
+        }
+
+        .password-toggle i {
+            font-size: 1.1rem;
         }
 
         .password-toggle:hover {
@@ -616,13 +635,13 @@
                     <div class="input-wrapper">
                         <input 
                             type="password" 
-                            class="form-control" 
+                            class="form-control has-toggle" 
                             id="password" 
                             name="password" 
                             placeholder="Enter your password"
                             autocomplete="current-password"
                             required
-                            style="color: #ffffff; -webkit-text-fill-color: #ffffff; background-color: #1e3a5f; border: 2px solid #3b82f6;"
+                            style="color: #ffffff; -webkit-text-fill-color: #ffffff; background-color: #1e3a5f; border: 2px solid #3b82f6; padding-right: 3rem;"
                         >
                         <i class="bi bi-lock"></i>
                         <button type="button" class="password-toggle" onclick="togglePassword()">
