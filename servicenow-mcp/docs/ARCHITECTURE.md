@@ -131,7 +131,7 @@ This platform provides an automated integration between **ServiceNow** (IT Servi
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                     PROCESSING LAYER (Python)                        │   │
 │  │                                                                       │   │
-│  │   process_servicenow_redshift.py                                     │   │
+│  │                                        │   │
 │  │   ┌─────────────────┐ ┌─────────────────┐ ┌──────────────────────┐  │   │
 │  │   │     Config      │ │ ServiceNowClient│ │   RedshiftClient     │  │   │
 │  │   │  (Environment)  │ │  (REST API)     │ │   (boto3 SDK)        │  │   │
@@ -532,7 +532,7 @@ User → ServiceNow UI → Create Incident
 │   │  client.execute_statement(                               │   │
 │   │      ClusterIdentifier='redshift-cluster-1',             │   │
 │   │      Database='dev',                                     │   │
-│   │      DbUser='awsuser',                                   │   │
+│   │      DbUser='example',                                   │   │
 │   │      Sql='CREATE USER user11 PASSWORD DISABLE;'          │   │
 │   │  )                                                       │   │
 │   │  → Returns: {"Id": "statement-id-xxx"}                   │   │
