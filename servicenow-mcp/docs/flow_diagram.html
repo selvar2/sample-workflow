@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServiceNow-Redshift MCP Flow Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .diagram-container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+        .diagram-title {
+            font-size: 1.3em;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        .instructions {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 ServiceNow-Redshift MCP Integration Flow Diagrams</h1>
+        
+        <!-- Flow Diagram 1: Incident Processing Workflow -->
+        <div class="diagram-container">
+            <div class="diagram-title">1. Incident Processing Workflow</div>
+            <div class="mermaid">
+flowchart LR
+    A([🚀 Start]) --> B[📝 User Request<br/>in ServiceNow]
+    B --> C[🔌 ServiceNow<br/>API/MCP]
+    C --> D[🤖 Agent<br/>Orchestrator/<br/>MCP Client]
+    D --> E{🔍 Checks<br/>new incident<br/>or not}
+    E -->|No| F[✅ Incident already<br/>processed, no<br/>actions required]
+    F --> G([🏁 End])
+    E -->|Yes| H[📋 Found New<br/>Incident]
+    H --> I[⚡ Process Required<br/>Redshift commands<br/>through Redshift MCP]
+    I --> J[📝 Update ServiceNow<br/>incident notes]
+    J --> G
+
+    style A fill:#f9e6ff,stroke:#9b59b6,stroke-width:2px
+    style B fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style C fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style D fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style E fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
+    style F fill:#e8f5e9,stroke:#4caf50,stroke-width:2px
+    style G fill:#f9e6ff,stroke:#9b59b6,stroke-width:2px
+    style H fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+    style I fill:#fce4ec,stroke:#e91e63,stroke-width:2px
+    style J fill:#fff9c4,stroke:#f39c12,stroke-width:2px
+            </div>
+        </div>
+
+        <!-- Flow Diagram 2: Architecture Overview -->
+        <div class="diagram-container">
+            <div class="diagram-title">2. System Architecture Overview</div>
+            <div class="mermaid">
+flowchart TB
+    subgraph UI["🖥️ USER INTERFACE LAYER"]
+        Flask["Flask Web Application"]
+        Login["Login Page"]
+        Dashboard["Dashboard View"]
+        Monitor["Monitor Control"]
+        History["History View"]
+    end
+
+    subgraph APP["⚙️ APPLICATION LAYER"]
+        subgraph MCP["ServiceNow MCP Server"]
+            Tools["Tool Registry<br/>(80+ MCP Tools)"]
+            Auth["Auth Manager"]
+            Config["Config Manager"]
+        end
+        subgraph PROC["Incident Processor"]
+            Parser["Parser"]
+            Executor["Executor"]
+            SNClient["ServiceNowClient"]
+            RSClient["RedshiftClient"]
+        end
+    end
+
+    subgraph EXT["🌐 EXTERNAL SERVICES"]
+        subgraph SNOW["ServiceNow"]
+            API1["REST Table API"]
+            Tables["29 Tables"]
+        end
+        subgraph AWS["AWS Cloud"]
+            RSAPI["Redshift Data API"]
+            Cluster["Redshift Cluster"]
+        end
+    end
+
+    Flask --> Login & Dashboard & Monitor & History
+    UI --> APP
+    SNClient --> SNOW
+    RSClient --> AWS
+
+    style UI fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style APP fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    style EXT fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px
+            </div>
+        </div>
+
+        <!-- Flow Diagram 3: Data Flow Sequence -->
+        <div class="diagram-container">
+            <div class="diagram-title">3. Data Flow Sequence</div>
+            <div class="mermaid">
+sequenceDiagram
+    participant U as 👤 User
+    participant F as 🖥️ Flask UI
+    participant P as 🤖 Incident Processor
+    participant S as 📋 ServiceNow MCP
+    participant R as 🗄️ Redshift MCP
+
+    U->>F: Create Request
+    F->>P: Trigger Processing
+    P->>S: Fetch New Incidents
+    S-->>P: Return Incident Data
+    P->>P: Parse Redshift Instructions
+    P->>R: Execute Query
+    R-->>P: Return Results
+    P->>S: Update Incident Notes
+    S-->>P: Confirm Update
+    P-->>F: Processing Complete
+    F-->>U: Show Results
+            </div>
+        </div>
+
+        <div class="instructions">
+            <strong>💡 To save as image:</strong><br/>
+            1. Right-click on any diagram → "Save image as..." (in some browsers)<br/>
+            2. Or use browser's Print → Save as PDF<br/>
+            3. Or take a screenshot (Windows: Win+Shift+S, Mac: Cmd+Shift+4)
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>
