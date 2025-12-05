@@ -227,4 +227,194 @@ response = client.execute_statement(
 
 ---
 
+## 7. MCP Tools Reference
+
+The ServiceNow MCP Server exposes the following tools organized by functional area:
+
+### Incident Management Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `create_incident` | Create a new incident in ServiceNow |
+| `update_incident` | Update an existing incident (state, work notes, etc.) |
+| `add_comment` | Add a comment or work note to an incident |
+| `resolve_incident` | Resolve an incident with resolution code and notes |
+| `list_incidents` | List incidents with filtering and pagination |
+| `get_incident_by_number` | Retrieve incident details by incident number |
+
+### Service Catalog Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `list_catalogs` | List available service catalogs |
+| `list_catalog_items` | List catalog items with filtering |
+| `get_catalog_item` | Get details of a specific catalog item |
+| `create_catalog_item` | Create a new catalog item |
+| `update_catalog_item` | Update an existing catalog item |
+| `list_catalog_categories` | List catalog categories |
+| `create_catalog_category` | Create a new catalog category |
+| `update_catalog_category` | Update a catalog category |
+| `move_catalog_items` | Move items between categories |
+| `get_optimization_recommendations` | Get catalog optimization suggestions |
+| `create_catalog_item_variable` | Create a variable for a catalog item |
+| `list_catalog_item_variables` | List variables for a catalog item |
+| `update_catalog_item_variable` | Update a catalog item variable |
+| `delete_catalog_item_variable` | Delete a catalog item variable |
+| `create_catalog_variable_choice` | Create choices for a variable |
+
+### Change Management Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `create_change_request` | Create a new change request |
+| `update_change_request` | Update an existing change request |
+| `list_change_requests` | List change requests with filtering |
+| `get_change_request_details` | Get details of a specific change request |
+| `add_change_task` | Add a task to a change request |
+| `submit_change_for_approval` | Submit change for approval workflow |
+| `approve_change` | Approve a change request |
+| `reject_change` | Reject a change request |
+
+### User Management Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `create_user` | Create a new user in ServiceNow |
+| `update_user` | Update user information |
+| `get_user` | Get user details by ID, username, or email |
+| `list_users` | List users with filtering |
+| `create_group` | Create a new user group |
+| `update_group` | Update group information |
+| `list_groups` | List user groups |
+| `add_group_members` | Add members to a group |
+| `remove_group_members` | Remove members from a group |
+
+### Knowledge Base Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `create_knowledge_base` | Create a new knowledge base |
+| `list_knowledge_bases` | List available knowledge bases |
+| `create_category` | Create a KB category |
+| `list_categories` | List KB categories |
+| `create_article` | Create a new knowledge article |
+| `update_article` | Update an existing article |
+| `publish_article` | Publish a knowledge article |
+| `list_articles` | List articles with filtering |
+| `get_article` | Get article details |
+
+### Workflow Management Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `list_workflows` | List workflows in ServiceNow |
+| `get_workflow_details` | Get details of a specific workflow |
+| `list_workflow_versions` | List versions of a workflow |
+| `get_workflow_activities` | Get activities in a workflow |
+| `create_workflow` | Create a new workflow |
+| `update_workflow` | Update an existing workflow |
+| `activate_workflow` | Activate a workflow |
+| `deactivate_workflow` | Deactivate a workflow |
+| `add_workflow_activity` | Add an activity to a workflow |
+| `update_workflow_activity` | Update a workflow activity |
+| `delete_workflow_activity` | Delete a workflow activity |
+| `reorder_workflow_activities` | Reorder activities in a workflow |
+
+### Changeset/Update Set Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `list_changesets` | List update sets |
+| `get_changeset_details` | Get details of a changeset |
+| `create_changeset` | Create a new update set |
+| `update_changeset` | Update a changeset |
+| `commit_changeset` | Commit a changeset |
+| `publish_changeset` | Publish a changeset |
+| `add_file_to_changeset` | Add a file to a changeset |
+
+### Script Include Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `list_script_includes` | List script includes |
+| `get_script_include` | Get script include details |
+| `create_script_include` | Create a new script include |
+| `update_script_include` | Update a script include |
+| `delete_script_include` | Delete a script include |
+| `execute_script_include` | Execute a script include |
+
+### Agile/Project Management Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `create_story` | Create an agile story |
+| `update_story` | Update an agile story |
+| `list_stories` | List agile stories |
+| `list_story_dependencies` | List story dependencies |
+| `create_story_dependency` | Create a story dependency |
+| `delete_story_dependency` | Delete a story dependency |
+| `create_epic` | Create an epic |
+| `update_epic` | Update an epic |
+| `list_epics` | List epics |
+| `create_scrum_task` | Create a scrum task |
+| `update_scrum_task` | Update a scrum task |
+| `list_scrum_tasks` | List scrum tasks |
+| `create_project` | Create a project |
+| `update_project` | Update a project |
+| `list_projects` | List projects |
+
+### UI Policy Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `create_ui_policy` | Create a UI policy |
+| `create_ui_policy_action` | Create a UI policy action |
+| `create_user_criteria` | Create user criteria |
+| `create_user_criteria_condition` | Create user criteria condition |
+
+### System Tools
+
+| Tool Name | Description |
+|-----------|-------------|
+| `list_syslog_entries` | List system log entries |
+| `get_syslog_entry` | Get a specific syslog entry |
+| `list_tool_packages` | List available MCP tool packages |
+
+---
+
+## 8. AWS Redshift MCP Tools
+
+The Redshift integration provides the following operations via the `RedshiftClient` class:
+
+| Tool/Method | Description |
+|-------------|-------------|
+| `execute_statement` | Execute SQL statement on Redshift cluster |
+| `describe_statement` | Check status of executed statement |
+| `get_statement_result` | Retrieve query results |
+| `user_exists` | Check if a database user exists |
+| `create_user` | Create a new database user with password disabled |
+| `verify_user` | Verify user creation and retrieve user info |
+
+---
+
+## 9. Tool Packages
+
+The MCP server supports loading specific tool packages based on role:
+
+| Package Name | Description | Tool Count |
+|--------------|-------------|------------|
+| `full` | All available tools | 80+ |
+| `service_desk` | Incident and user lookup tools | 11 |
+| `catalog_builder` | Catalog management tools | 15 |
+| `change_coordinator` | Change management tools | 8 |
+| `knowledge_author` | Knowledge base tools | 9 |
+| `platform_developer` | Scripting and workflow tools | 20 |
+| `agile_management` | Agile/project tools | 15 |
+| `system_administrator` | User and group management | 12 |
+| `none` | No tools (introspection only) | 0 |
+
+Set the `MCP_TOOL_PACKAGE` environment variable to load a specific package.
+
+---
+
 *Document generated for Gen AI Event - December 2025*
