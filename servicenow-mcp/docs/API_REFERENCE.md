@@ -417,4 +417,150 @@ Set the `MCP_TOOL_PACKAGE` environment variable to load a specific package.
 
 ---
 
+## 10. Technology Stack
+
+### Programming Languages
+
+| Language | Version | Usage |
+|----------|---------|-------|
+| **Python** | 3.11+ | Backend, MCP Server, API integrations |
+| **HTML5** | - | Web UI templates |
+| **CSS3** | - | Styling and responsive design |
+| **JavaScript** | ES6+ | Frontend interactivity |
+
+### Backend Frameworks & Libraries
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Flask** | ≥2.3.0 | Web application framework for UI |
+| **Flask-CORS** | ≥4.0.0 | Cross-Origin Resource Sharing support |
+| **Gunicorn** | ≥21.0.0 | Production WSGI HTTP Server |
+| **Starlette** | ≥0.27.0 | ASGI framework for MCP server |
+| **Uvicorn** | ≥0.22.0 | ASGI server for async operations |
+| **MCP SDK** | 1.3.0 | Model Context Protocol implementation |
+
+### Data & API Libraries
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Requests** | ≥2.28.0 | HTTP client for ServiceNow REST API |
+| **HTTPX** | ≥0.24.0 | Async HTTP client |
+| **Boto3** | ≥1.34.0 | AWS SDK for Python (Redshift Data API) |
+| **Pydantic** | ≥2.0.0 | Data validation and serialization |
+| **PyYAML** | ≥6.0 | YAML configuration parsing |
+| **python-dotenv** | ≥1.0.0 | Environment variable management |
+
+### Frontend Technologies
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Bootstrap** | 5.3.2 | CSS framework for responsive UI |
+| **Bootstrap Icons** | 1.11.1 | Icon library |
+| **Vanilla JavaScript** | ES6+ | DOM manipulation, async fetch calls |
+
+### Cloud Services & APIs
+
+| Service | Provider | Purpose |
+|---------|----------|---------|
+| **ServiceNow Instance** | ServiceNow | ITSM platform (incidents, changes, catalog) |
+| **AWS Redshift** | Amazon Web Services | Data warehouse for database operations |
+| **AWS Redshift Data API** | Amazon Web Services | Serverless SQL execution |
+| **AWS IAM** | Amazon Web Services | Authentication and authorization |
+
+### Development Tools
+
+| Tool | Purpose |
+|------|---------|
+| **pytest** | Unit testing framework |
+| **pytest-cov** | Code coverage reporting |
+| **black** | Code formatting |
+| **isort** | Import sorting |
+| **mypy** | Static type checking |
+| **ruff** | Fast Python linter |
+
+### DevOps & Deployment
+
+| Technology | Purpose |
+|------------|---------|
+| **Docker** | Containerization |
+| **GitHub Codespaces** | Cloud development environment |
+| **Render.com** | Cloud deployment platform |
+| **Git** | Version control |
+| **VS Code Dev Containers** | Development environment |
+
+### Container & Runtime
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Python Base Image** | 3.11-slim | Docker container base |
+| **Dev Container Image** | python:3.12-bullseye | Development environment |
+| **AWS CLI** | Latest | AWS command-line operations |
+| **Docker-in-Docker** | Latest | Container builds in dev |
+
+### Architecture Components
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Web UI (Flask)                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │  Bootstrap  │  │   Jinja2    │  │   JavaScript (ES6+)     │ │
+│  │    5.3.2    │  │  Templates  │  │   Async Fetch API       │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Backend Services                              │
+│  ┌─────────────────────────┐  ┌─────────────────────────────┐  │
+│  │   ServiceNow MCP Server │  │   Incident Processor        │  │
+│  │   (Starlette/Uvicorn)   │  │   (Python + Boto3)          │  │
+│  │                         │  │                             │  │
+│  │   - MCP Protocol 1.3.0  │  │   - Redshift Data API       │  │
+│  │   - Pydantic Models     │  │   - ServiceNow REST API     │  │
+│  │   - Tool Registration   │  │   - Incident Parsing        │  │
+│  └─────────────────────────┘  └─────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐    ┌─────────────────────────────────┐
+│      ServiceNow         │    │         AWS Redshift            │
+│  ┌─────────────────┐    │    │   ┌─────────────────────────┐   │
+│  │  REST Table API │    │    │   │   Redshift Data API     │   │
+│  │  /api/now/table │    │    │   │   execute_statement     │   │
+│  └─────────────────┘    │    │   │   describe_statement    │   │
+│                         │    │   │   get_statement_result  │   │
+│  Tables:                │    │   └─────────────────────────┘   │
+│  - incident             │    │                                 │
+│  - change_request       │    │   Cluster: redshift-cluster-1   │
+│  - sc_cat_item          │    │   Database: dev                 │
+│  - sys_user             │    │   Region: us-east-1             │
+│  - kb_knowledge         │    │                                 │
+└─────────────────────────┘    └─────────────────────────────────┘
+```
+
+### Protocol & Standards
+
+| Standard | Usage |
+|----------|-------|
+| **MCP (Model Context Protocol)** | AI-to-service communication |
+| **REST API** | ServiceNow integration |
+| **JSON** | Data interchange format |
+| **YAML** | Configuration files |
+| **OAuth 2.0** | ServiceNow authentication (optional) |
+| **HTTP Basic Auth** | ServiceNow authentication (default) |
+| **IAM** | AWS authentication |
+
+### Environment Requirements
+
+| Requirement | Specification |
+|-------------|---------------|
+| Python Version | ≥3.11 |
+| Node.js | Not required (vanilla JS) |
+| Docker | Optional (for containerization) |
+| AWS Account | Required for Redshift operations |
+| ServiceNow Instance | Required (PDI or enterprise) |
+
+---
+
 *Document generated for Gen AI Event - December 2025*
