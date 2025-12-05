@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 Script to update the ServiceNow incident with actual Redshift operation results.
+# This code is for testing purposes only.
 """
 
 import os

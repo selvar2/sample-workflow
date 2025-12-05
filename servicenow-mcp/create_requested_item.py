@@ -4,6 +4,8 @@ Create a Requested Item (RITM) in ServiceNow Service Catalog.
 
 This script creates a ServiceNow Requested Item with the specified details.
 A Requested Item represents an individual item requested from the Service Catalog.
+# This code is for testing purposes only.
+
 """
 
 import json

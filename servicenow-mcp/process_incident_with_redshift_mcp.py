@@ -2,6 +2,7 @@
 """
 Script to process ServiceNow incident using AWS Redshift Data API (Redshift MCP Server).
 This script reads the incident, executes the database operations, and updates the incident.
+# This code is for testing purpose
 """
 
 import os

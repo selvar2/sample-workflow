@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 Script to update an incident in ServiceNow with work notes.
+# This code is for testing purposes only.
 """
 
 import os

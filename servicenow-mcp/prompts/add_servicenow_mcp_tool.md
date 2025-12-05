@@ -4,7 +4,7 @@ Use this prompt to guide the development of new tools for the ServiceNow MCP pro
 
 ## Background
 
-The ServiceNow MCP (Model Completion Protocol) server allows Claude to interact with ServiceNow instances, retrieving data and performing actions through the ServiceNow API. Adding new tools expands the capabilities of this bridge.
+The ServiceNow MCP (Model Context Protocol) server allows Claude to interact with ServiceNow instances, retrieving data and performing actions through the ServiceNow API. Adding new tools expands the capabilities of this bridge.
 
 ## Required Files to Create/Modify
 

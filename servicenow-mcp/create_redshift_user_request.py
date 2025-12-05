@@ -3,6 +3,8 @@
 Create a change request for adding a database user to Redshift cluster.
 
 This script creates a ServiceNow change request with the specified details.
+
+# This code is for testing purposes only.
 """
 
 import json
