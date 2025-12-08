@@ -7,7 +7,7 @@ A Flask-based web application that provides a user-friendly interface for:
 - Processing incidents with Redshift operations
 - Viewing incident history and status
 - Managing the monitoring service
-- User authentication and session management
+- User authentication and session management (Database-backed with AG-UI integration)
 """
 
 import os
@@ -15,7 +15,6 @@ import sys
 import json
 import threading
 import queue
-import hashlib
 import secrets
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
@@ -29,6 +28,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 load_dotenv()
+
+# Import database-backed authentication modules
+from web_ui import database as db
+from web_ui import auth
+from web_ui.agui_auth import AuthActionHandler, create_agui_auth_routes
 
 # Import the core processor
 from process_servicenow_redshift import (
@@ -44,8 +48,11 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 CORS(app)
 
+# Initialize AG-UI authentication handler
+auth_handler = None  # Will be initialized after app setup
+
 # ============================================================================
-# Persistent Storage
+# Persistent Storage (Processing History - unchanged)
 # ============================================================================
 
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), 'processing_history.json')
@@ -75,33 +82,18 @@ def add_to_history(result: Dict[str, Any]):
     save_history(state.processed_incidents)
 
 # ============================================================================
-# User Authentication (Environment Variable Based - No File Storage)
+# User Authentication (Database-backed with AG-UI Integration)
 # ============================================================================
-
-def hash_password(password: str, salt: str = None) -> tuple:
-    """Hash a password with salt for secure storage."""
-    if salt is None:
-        salt = secrets.token_hex(16)
-    hashed = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
-    return hashed.hex(), salt
-
-def verify_password(password: str, hashed: str, salt: str) -> bool:
-    """Verify a password against its hash."""
-    new_hash, _ = hash_password(password, salt)
-    return new_hash == hashed
 
 def get_users_from_env() -> Dict[str, Any]:
     """
-    Get users from environment variables.
+    LEGACY: Get users from environment variables.
+    Used only for migration purposes.
     
     Set credentials using: APP_USERS=admin:password1,demo:password2
-    
-    Example:
-        export APP_USERS=admin:secretpass,demo:demopass
     """
     users = {}
     
-    # Get users from APP_USERS env var (format: username:password,username2:password2)
     combined_users = os.getenv('APP_USERS', '')
     if combined_users:
         for user_pair in combined_users.split(','):
@@ -110,7 +102,7 @@ def get_users_from_env() -> Dict[str, Any]:
                 username = username.strip().lower()
                 password = password.strip()
                 if username and password:
-                    hashed, salt = hash_password(password)
+                    hashed, salt = auth.hash_password(password)
                     users[username] = {
                         'password_hash': hashed,
                         'salt': salt,
@@ -118,12 +110,11 @@ def get_users_from_env() -> Dict[str, Any]:
                         'display_name': username.title()
                     }
     
-    # Also support individual env vars (APP_USER_ADMIN=password)
     for key, value in os.environ.items():
         if key.startswith('APP_USER_') and value:
-            username = key[9:].lower()  # Remove 'APP_USER_' prefix
-            if username not in users:  # Don't override APP_USERS
-                hashed, salt = hash_password(value)
+            username = key[9:].lower()
+            if username not in users:
+                hashed, salt = auth.hash_password(value)
                 users[username] = {
                     'password_hash': hashed,
                     'salt': salt,
@@ -133,27 +124,38 @@ def get_users_from_env() -> Dict[str, Any]:
     
     return users
 
-# Cache for user credentials (computed once at startup)
-_cached_users = None
 
-def load_users() -> Dict[str, Any]:
-    """Load users from environment variables (cached)."""
-    global _cached_users
-    if _cached_users is None:
-        _cached_users = get_users_from_env()
-    return _cached_users
+def migrate_env_users_if_needed():
+    """
+    Automatically migrate users from environment variables to database
+    if the database is empty and APP_USERS is set.
+    """
+    if db.get_user_count() == 0:
+        env_users = get_users_from_env()
+        if env_users:
+            print("Migrating users from environment variables to database...")
+            created, skipped = db.migrate_env_users_to_db(env_users)
+            print(f"Migration complete: {created} users created, {skipped} skipped")
+        else:
+            # Check for INITIAL_ADMIN_PASSWORD
+            auth.ensure_admin_user()
+
 
 def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
-    """Authenticate a user and return user data if successful."""
-    users = load_users()
-    user = users.get(username.lower())
-    if user and verify_password(password, user['password_hash'], user['salt']):
-        return {
-            'username': username,
-            'role': user.get('role', 'user'),
-            'display_name': user.get('display_name', username)
-        }
-    return None
+    """
+    Authenticate a user using the database-backed authentication.
+    Returns user data if successful, None otherwise.
+    """
+    ip_address = auth.get_client_ip(request) if request else None
+    user_agent = auth.get_user_agent(request) if request else None
+    
+    return auth.authenticate_user(
+        username=username,
+        password=password,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+
 
 def login_required(f):
     """Decorator to require login for protected routes."""
@@ -658,8 +660,16 @@ if __name__ == '__main__':
         print("Please set SERVICENOW_INSTANCE_URL, SERVICENOW_USERNAME, and SERVICENOW_PASSWORD.")
         sys.exit(1)
     
-    # Load users from environment (will use defaults if USE_DEFAULT_AUTH=true)
-    users = load_users()
+    # Initialize database and migrate users if needed
+    db.init_database()
+    migrate_env_users_if_needed()
+    
+    # Initialize AG-UI authentication routes
+    auth_handler = create_agui_auth_routes(app, auth)
+    
+    # Get user count from database
+    user_count = db.get_user_count()
+    users_list = db.list_users()
     
     port = int(os.getenv("WEB_UI_PORT", 5000))
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
@@ -672,14 +682,21 @@ if __name__ == '__main__':
     print(f"AWS Region: {Config.AWS_REGION}")
     print(f"Dry Run Mode: {state.dry_run}")
     print("-" * 70)
-    print("Authentication: Environment Variable Based (No Hardcoded Passwords)")
-    if users:
-        print(f"Users configured: {list(users.keys())}")
+    print("Authentication: Database-backed with AG-UI Protocol Integration")
+    print(f"Database: {db.DB_PATH}")
+    if user_count > 0:
+        print(f"Users configured: {[u['username'] for u in users_list]}")
     else:
         print("⚠️  NO USERS CONFIGURED - Login will not work!")
         print("")
-        print("Set credentials using environment variable:")
+        print("Option 1: Set APP_USERS env var (auto-migrates to database):")
         print("  export APP_USERS=admin:yourpassword,demo:anotherpass")
+        print("")
+        print("Option 2: Set INITIAL_ADMIN_PASSWORD for first admin:")
+        print("  export INITIAL_ADMIN_PASSWORD=securepassword")
+        print("")
+        print("Option 3: Run migration script:")
+        print("  python scripts/migrate_to_db_auth.py")
         print("")
         print("Then restart the application.")
     print("=" * 70)
