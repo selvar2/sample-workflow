@@ -17,7 +17,23 @@ sudo apt-get install -y \
     tree \
     vim \
     less \
-    postgresql-client
+    postgresql-client \
+    sqlite3 \
+    libsqlite3-dev
+
+# Install Node.js 20.x for AG-UI
+echo "📦 Installing Node.js 20.x for AG-UI..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install pnpm globally for AG-UI
+echo "📦 Installing pnpm for AG-UI..."
+sudo npm install -g pnpm
+
+# Verify Node.js and pnpm installation
+echo "✅ Node.js version: $(node --version)"
+echo "✅ npm version: $(npm --version)"
+echo "✅ pnpm version: $(pnpm --version)"
 
 # Install uv (Python package installer)
 echo "📦 Installing uv..."
@@ -78,6 +94,10 @@ pip install python-dotenv pytest pytest-cov black flake8 mypy
 # Install AWS SDK and Web UI dependencies
 echo "📦 Installing boto3 and Flask dependencies..."
 pip install boto3>=1.34.0 flask>=2.3.0 flask-cors>=4.0.0
+
+# Install database authentication dependencies (bcrypt for password hashing)
+echo "📦 Installing database authentication dependencies..."
+pip install bcrypt>=4.0.0
 
 # Ensure python-dotenv is installed (critical dependency)
 echo "📦 Verifying python-dotenv installation..."
@@ -160,6 +180,17 @@ echo "  - update-incident  : Update incident with notes"
 echo ""
 echo "🚀 Ready to go! Run 'activate-sn' to start working."
 echo ""
+
+# Build AG-UI if directory exists
+if [ -d "/workspaces/sample-workflow/ag-ui" ]; then
+    echo "📦 Installing AG-UI dependencies..."
+    cd /workspaces/sample-workflow/ag-ui
+    pnpm install || true
+    echo "🔨 Building AG-UI..."
+    pnpm build || echo "⚠️  AG-UI build completed with some warnings (this is normal for examples)"
+    cd /workspaces/sample-workflow/servicenow-mcp
+    source .venv/bin/activate
+fi
 
 # Run verification
 echo "🔍 Running installation verification..."

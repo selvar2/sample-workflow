@@ -41,7 +41,7 @@ fi
 echo "🔍 Verifying all dependencies..."
 MISSING=0
 
-for package in "mcp" "requests" "pydantic" "dotenv" "starlette" "uvicorn" "httpx" "yaml"; do
+for package in "mcp" "requests" "pydantic" "dotenv" "starlette" "uvicorn" "httpx" "yaml" "bcrypt" "sqlite3" "flask"; do
     if ! python -c "import $package" 2>/dev/null; then
         echo "❌ Missing package: $package"
         MISSING=1
@@ -53,14 +53,44 @@ if [ $MISSING -eq 1 ]; then
     cd "$PROJECT_PATH"
     pip install --upgrade pip
     pip install -e .
+    pip install bcrypt flask flask-cors boto3
     echo "✅ All dependencies installed"
 else
     echo "✅ All dependencies are present"
 fi
 
+# Verify Node.js and pnpm for AG-UI
+echo "🔍 Verifying AG-UI dependencies (Node.js/pnpm)..."
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js not found"
+else
+    echo "✅ Node.js: $(node --version)"
+fi
+
+if ! command -v pnpm &> /dev/null; then
+    echo "❌ pnpm not found"
+else
+    echo "✅ pnpm: $(pnpm --version)"
+fi
+
+# Verify SQLite
+if ! command -v sqlite3 &> /dev/null; then
+    echo "❌ SQLite3 CLI not found"
+else
+    echo "✅ SQLite3: $(sqlite3 --version | head -c 20)"
+fi
+
 echo ""
 echo "📋 Installed packages:"
-pip list | grep -E "(mcp|requests|pydantic|dotenv|starlette|uvicorn|httpx|PyYAML)" || true
+pip list | grep -E "(mcp|requests|pydantic|dotenv|starlette|uvicorn|httpx|PyYAML|bcrypt|Flask)" || true
+
+echo ""
+echo "📋 Database files:"
+if [ -f "$PROJECT_PATH/web_ui/auth.db" ]; then
+    echo "✅ Authentication database: $PROJECT_PATH/web_ui/auth.db"
+else
+    echo "ℹ️  Authentication database will be created on first run"
+fi
 
 echo ""
 echo "✅ Dependency check complete!"

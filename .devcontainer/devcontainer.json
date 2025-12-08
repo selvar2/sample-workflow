@@ -32,7 +32,7 @@
   },
 
   "postCreateCommand": "bash .devcontainer/setup.sh",
-  "postStartCommand": "cd /workspaces/sample-workflow/servicenow-mcp && [ -d .venv ] && (.venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv boto3 flask flask-cors) || (python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv boto3 flask flask-cors)",
+  "postStartCommand": "cd /workspaces/sample-workflow/servicenow-mcp && [ -d .venv ] && (.venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv boto3 flask flask-cors bcrypt) || (python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv boto3 flask flask-cors bcrypt)",
   "postAttachCommand": "cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate",
   
   "remoteEnv": {
