@@ -22,7 +22,10 @@
         "ms-python.debugpy",
         "ms-toolsai.jupyter",
         "redhat.vscode-yaml",
-        "ms-azuretools.vscode-docker"
+        "ms-azuretools.vscode-docker",
+        "saoudrizwan.claude-dev",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/workspaces/sample-workflow/servicenow-mcp/.venv/bin/python",
@@ -44,7 +47,8 @@
     "AWS_DEFAULT_REGION": "us-east-1",
     "AWS_ACCESS_KEY_ID": "${localEnv:AWS_ACCESS_KEY_ID}",
     "AWS_SECRET_ACCESS_KEY": "${localEnv:AWS_SECRET_ACCESS_KEY}",
-    "FASTMCP_LOG_LEVEL": "INFO"
+    "FASTMCP_LOG_LEVEL": "INFO",
+    "MAGIC_API_KEY": "${localEnv:MAGIC_API_KEY}"
   },
 
   "mounts": [

@@ -80,6 +80,35 @@ else
     echo "✅ SQLite3: $(sqlite3 --version | head -c 20)"
 fi
 
+# Verify magic-mcp dependencies
+echo "🔍 Verifying magic-mcp dependencies..."
+if [ -d "/workspaces/sample-workflow/magic-mcp" ]; then
+    if [ -d "/workspaces/sample-workflow/magic-mcp/node_modules" ]; then
+        echo "✅ magic-mcp: node_modules installed"
+    else
+        echo "⚠️  magic-mcp: node_modules missing, installing..."
+        cd /workspaces/sample-workflow/magic-mcp
+        npm install || true
+        cd "$PROJECT_PATH"
+    fi
+else
+    echo "ℹ️  magic-mcp directory not found"
+fi
+
+# Verify 21st-dev CLI
+if command -v npx &> /dev/null; then
+    echo "✅ npx available for @21st-dev/cli"
+else
+    echo "❌ npx not found"
+fi
+
+# Verify MAGIC_API_KEY
+if [ -n "$MAGIC_API_KEY" ]; then
+    echo "✅ MAGIC_API_KEY: configured"
+else
+    echo "⚠️  MAGIC_API_KEY: not set (add to GitHub Codespaces secrets)"
+fi
+
 echo ""
 echo "📋 Installed packages:"
 pip list | grep -E "(mcp|requests|pydantic|dotenv|starlette|uvicorn|httpx|PyYAML|bcrypt|Flask)" || true

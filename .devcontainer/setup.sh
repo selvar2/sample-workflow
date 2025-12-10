@@ -192,6 +192,26 @@ if [ -d "/workspaces/sample-workflow/ag-ui" ]; then
     source .venv/bin/activate
 fi
 
+# Install magic-mcp dependencies if directory exists
+if [ -d "/workspaces/sample-workflow/magic-mcp" ]; then
+    echo "📦 Installing magic-mcp dependencies..."
+    cd /workspaces/sample-workflow/magic-mcp
+    npm install || true
+    npm run build || echo "⚠️  magic-mcp build completed with warnings"
+    cd /workspaces/sample-workflow/servicenow-mcp
+    source .venv/bin/activate
+fi
+
+# Install 21st-dev CLI globally for Cline integration
+echo "📦 Installing 21st-dev CLI for Cline..."
+npm install -g @21st-dev/cli@latest || true
+
+# Configure Cline with magic-mcp if API key is available
+if [ -n "$MAGIC_API_KEY" ]; then
+    echo "🔧 Configuring Cline with magic-mcp..."
+    npx -y @21st-dev/cli@latest install cline --api-key "$MAGIC_API_KEY" --skip-restart || true
+fi
+
 # Run verification
 echo "🔍 Running installation verification..."
 echo ""
