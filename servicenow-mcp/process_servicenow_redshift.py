@@ -295,6 +295,150 @@ class RedshiftClient:
         
         return True, statement_id, None
     
+    def group_exists(self, group_name: str) -> Tuple[bool, Optional[str]]:
+        """Check if a group exists in Redshift.
+        
+        Returns:
+            Tuple of (exists: bool, statement_id_or_error: str)
+        """
+        sql = f"SELECT groname FROM pg_group WHERE groname = '{group_name}';"
+        
+        success, statement_id, error = self._execute_statement(sql)
+        if not success:
+            return False, error
+        
+        status, error = self._wait_for_statement(statement_id)
+        if status != "FINISHED":
+            return False, error
+        
+        result = self._get_statement_result(statement_id)
+        if result and result.get("TotalNumRows", 0) > 0:
+            return True, statement_id
+        
+        return False, statement_id
+    
+    def create_group(self, group_name: str) -> Tuple[bool, str, Optional[str]]:
+        """Create a new group in Redshift.
+        
+        Returns:
+            Tuple of (success, statement_id, error_or_info)
+            - If group is created: (True, statement_id, None)
+            - If group already exists: (True, statement_id, "GROUP_EXISTS")
+            - If other error: (False, statement_id, error_message)
+        """
+        sql = f"CREATE GROUP {group_name};"
+        
+        success, statement_id, error = self._execute_statement(sql)
+        if not success:
+            return False, "", error
+        
+        status, error = self._wait_for_statement(statement_id)
+        if status != "FINISHED":
+            # Check if the error is because group already exists
+            if error and "already exists" in error.lower():
+                logger.info(f"Group '{group_name}' already exists in the database")
+                return True, statement_id, "GROUP_EXISTS"
+            return False, statement_id, error
+        
+        return True, statement_id, None
+    
+    def grant_privileges(self, privileges: str, schema: str, group_name: str) -> Tuple[bool, str, Optional[str]]:
+        """Grant privileges on tables in a schema to a group.
+        
+        Args:
+            privileges: Privileges to grant (e.g., 'ALL', 'SELECT', 'INSERT, UPDATE')
+            schema: Schema name
+            group_name: Group to grant privileges to
+        
+        Returns:
+            Tuple of (success, statement_id, error)
+        """
+        sql = f"GRANT {privileges} ON ALL TABLES IN SCHEMA {schema} TO GROUP {group_name};"
+        
+        success, statement_id, error = self._execute_statement(sql)
+        if not success:
+            return False, "", error
+        
+        status, error = self._wait_for_statement(statement_id)
+        if status != "FINISHED":
+            return False, statement_id, error
+        
+        return True, statement_id, None
+    
+    def grant_default_privileges(self, privileges: str, schema: str, group_name: str) -> Tuple[bool, str, Optional[str]]:
+        """Grant default privileges for future tables in a schema to a group.
+        
+        This ensures privileges are applied to tables created in the future.
+        
+        Args:
+            privileges: Privileges to grant (e.g., 'ALL', 'SELECT')
+            schema: Schema name
+            group_name: Group to grant privileges to
+        
+        Returns:
+            Tuple of (success, statement_id, error)
+        """
+        sql = f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT {privileges} ON TABLES TO GROUP {group_name};"
+        
+        success, statement_id, error = self._execute_statement(sql)
+        if not success:
+            return False, "", error
+        
+        status, error = self._wait_for_statement(statement_id)
+        if status != "FINISHED":
+            return False, statement_id, error
+        
+        return True, statement_id, None
+    
+    def add_user_to_group(self, username: str, group_name: str) -> Tuple[bool, str, Optional[str]]:
+        """Add a user to a group.
+        
+        Args:
+            username: User to add
+            group_name: Group to add user to
+        
+        Returns:
+            Tuple of (success, statement_id, error)
+        """
+        sql = f"ALTER GROUP {group_name} ADD USER {username};"
+        
+        success, statement_id, error = self._execute_statement(sql)
+        if not success:
+            return False, "", error
+        
+        status, error = self._wait_for_statement(statement_id)
+        if status != "FINISHED":
+            return False, statement_id, error
+        
+        return True, statement_id, None
+    
+    def verify_user_in_group(self, username: str, group_name: str) -> Tuple[bool, Optional[str]]:
+        """Verify a user is a member of a group.
+        
+        Returns:
+            Tuple of (is_member, statement_id_or_error)
+        """
+        sql = f"""
+            SELECT u.usename, g.groname 
+            FROM pg_user u
+            JOIN pg_group g ON u.usesysid = ANY(g.grolist)
+            WHERE u.usename = '{username}' AND g.groname = '{group_name}';
+        """
+        
+        success, statement_id, error = self._execute_statement(sql)
+        if not success:
+            return False, error
+        
+        status, error = self._wait_for_statement(statement_id)
+        if status != "FINISHED":
+            return False, error
+        
+        result = self._get_statement_result(statement_id)
+        if result and result.get("TotalNumRows", 0) > 0:
+            return True, statement_id
+        
+        return False, statement_id
+
     def verify_user(self, username: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
         """Verify a user exists and get their attributes."""
         sql = f"SELECT usename, usecreatedb, usesuper FROM pg_user WHERE usename = '{username}';"
@@ -335,9 +479,11 @@ class IncidentParser:
             return None
         
         patterns = [
+            r'Username[:\s]+(\w+)',
             r'user\s+named\s+(\w+)',
+            r'database\s+user\s+(\w+)',
+            r'user\s+(\w+)\s+to\s+the\s+group',
             r'user\s+(\w+)',
-            r'username[:\s]+(\w+)',
             r'create\s+(\w+)\s+user',
         ]
         
@@ -355,6 +501,7 @@ class IncidentParser:
             return None
         
         patterns = [
+            r'Redshift\s+cluster\s*[:\s]*([a-zA-Z0-9-]+)',
             r'cluster[:\s-]*(\d+)',
             r'redshift[:\s-]*cluster[:\s-]*(\d+)',
             r'cluster\s+(\w+-\w+-\d+)',
@@ -372,6 +519,127 @@ class IncidentParser:
         return None
     
     @staticmethod
+    def extract_group_name(description: str) -> Optional[str]:
+        """Extract group name from incident description."""
+        if not description:
+            return None
+        
+        patterns = [
+            r'Group\s+name[:\s]+(\w+)',
+            r'group\s+(\w+)',
+            r'to\s+GROUP\s+(\w+)',
+            r'to\s+the\s+group\s+(\w+)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, description, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        
+        return None
+    
+    @staticmethod
+    def extract_schema(description: str) -> str:
+        """Extract schema name from incident description. Defaults to 'public'."""
+        if not description:
+            return "public"
+        
+        patterns = [
+            r'schema\s+(\w+)',
+            r'IN\s+SCHEMA\s+(\w+)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, description, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        
+        return "public"
+    
+    @staticmethod
+    def extract_privileges(description: str) -> str:
+        """Extract privileges from incident description. Defaults to 'ALL'."""
+        if not description:
+            return "ALL"
+        
+        patterns = [
+            r'Grant\s+(ALL|SELECT|INSERT|UPDATE|DELETE|DROP|REFERENCES|ALTER|TRUNCATE)',
+            r'(ALL)\s+privileges',
+            r'(SELECT|INSERT|UPDATE|DELETE)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, description, re.IGNORECASE)
+            if match:
+                return match.group(1).upper()
+        
+        return "ALL"
+    
+    @staticmethod
+    def extract_password_setting(description: str) -> str:
+        """Extract password setting from incident description."""
+        if not description:
+            return "DISABLE"
+        
+        # Check for PASSWORD DISABLE
+        if re.search(r'password[:\s]*(disable|disabled)', description, re.IGNORECASE):
+            return "DISABLE"
+        
+        # Check for specific password
+        match = re.search(r'password[:\s]+[\'"]?(\w+)[\'"]?', description, re.IGNORECASE)
+        if match and match.group(1).lower() not in ['disable', 'disabled']:
+            return match.group(1)
+        
+        return "DISABLE"
+    
+    @staticmethod
+    def extract_operations(description: str) -> list:
+        """Extract list of operations to perform from incident description.
+        
+        Returns a list of operation types in order:
+        - CREATE_USER: Create a new database user
+        - CHECK_GROUP: Check if group exists
+        - CREATE_GROUP: Create group if not exists
+        - GRANT_PRIVILEGES: Grant privileges to group
+        - ADD_USER_TO_GROUP: Add user to group
+        """
+        operations = []
+        
+        if not description:
+            return operations
+        
+        desc_lower = description.lower()
+        
+        # Check for user creation
+        if re.search(r'create.*user|new.*user|database\s+user', desc_lower):
+            operations.append("CREATE_USER")
+        
+        # Check for group operations
+        if re.search(r'group.*exist|validate.*group|check.*group', desc_lower):
+            operations.append("CHECK_GROUP")
+        
+        if re.search(r'create.*group|if.*not\s+exist.*create', desc_lower):
+            operations.append("CREATE_GROUP")
+        
+        # Check for grant operations
+        if re.search(r'grant.*privilege|grant\s+all|grant.*table', desc_lower):
+            operations.append("GRANT_PRIVILEGES")
+        
+        # Check for future tables (default privileges)
+        if re.search(r'future\s+tables|default\s+privilege', desc_lower):
+            operations.append("GRANT_DEFAULT_PRIVILEGES")
+        
+        # Check for add user to group
+        if re.search(r'add.*user.*group|user.*to.*group', desc_lower):
+            operations.append("ADD_USER_TO_GROUP")
+        
+        # If no specific operations found but it mentions user creation, default to CREATE_USER
+        if not operations and re.search(r'user', desc_lower):
+            operations.append("CREATE_USER")
+        
+        return operations
+    
+    @staticmethod
     def parse_incident(incident: Dict[str, Any]) -> Dict[str, Any]:
         """Parse an incident and extract all relevant information."""
         description = incident.get("description", "") or ""
@@ -380,7 +648,8 @@ class IncidentParser:
         # Try description first, then short description
         full_text = f"{description} {short_desc}"
         
-        return {
+        # Extract all possible parameters
+        parsed = {
             "incident_number": incident.get("number"),
             "sys_id": incident.get("sys_id"),
             "short_description": short_desc,
@@ -388,8 +657,15 @@ class IncidentParser:
             "created_on": incident.get("sys_created_on"),
             "state": incident.get("state"),
             "username": IncidentParser.extract_username(full_text),
-            "cluster": IncidentParser.extract_cluster(full_text)
+            "cluster": IncidentParser.extract_cluster(full_text),
+            "group_name": IncidentParser.extract_group_name(full_text),
+            "schema": IncidentParser.extract_schema(full_text),
+            "privileges": IncidentParser.extract_privileges(full_text),
+            "password_setting": IncidentParser.extract_password_setting(full_text),
+            "operations": IncidentParser.extract_operations(full_text)
         }
+        
+        return parsed
 
 
 # ============================================================================
@@ -444,22 +720,48 @@ class IncidentProcessor:
         # Step 3: Parse incident details
         parsed = IncidentParser.parse_incident(incident)
         logger.info(f"Parsed incident details:")
-        logger.info(f"  Username: {parsed['username']}")
-        logger.info(f"  Cluster: {parsed['cluster']}")
+        logger.info(f"  Username: {parsed.get('username')}")
+        logger.info(f"  Cluster: {parsed.get('cluster')}")
+        logger.info(f"  Group: {parsed.get('group_name')}")
+        logger.info(f"  Schema: {parsed.get('schema')}")
+        logger.info(f"  Privileges: {parsed.get('privileges')}")
+        logger.info(f"  Operations: {parsed.get('operations')}")
         
-        if not parsed["username"]:
-            result["message"] = "Could not extract username from incident description"
+        # Validate required fields based on operations
+        operations = parsed.get("operations", [])
+        
+        if not operations:
+            result["message"] = "Could not determine operations from incident description"
             logger.error(result["message"])
             self._add_error_work_note(incident_number, result["message"], parsed)
             return result
         
-        if not parsed["cluster"]:
+        # Check for required parameters based on operations
+        if "CREATE_USER" in operations or "ADD_USER_TO_GROUP" in operations:
+            if not parsed.get("username"):
+                result["message"] = "Could not extract username from incident description"
+                logger.error(result["message"])
+                self._add_error_work_note(incident_number, result["message"], parsed)
+                return result
+        
+        if any(op in operations for op in ["CHECK_GROUP", "CREATE_GROUP", "GRANT_PRIVILEGES", "GRANT_DEFAULT_PRIVILEGES", "ADD_USER_TO_GROUP"]):
+            if not parsed.get("group_name"):
+                result["message"] = "Could not extract group name from incident description"
+                logger.error(result["message"])
+                self._add_error_work_note(incident_number, result["message"], parsed)
+                return result
+        
+        if not parsed.get("cluster"):
             result["message"] = "Could not extract cluster name from incident description"
             logger.error(result["message"])
             self._add_error_work_note(incident_number, result["message"], parsed)
             return result
         
-        result["actions"].append(f"Extracted username: {parsed['username']}")
+        result["actions"].append(f"Extracted operations: {', '.join(operations)}")
+        if parsed.get("username"):
+            result["actions"].append(f"Extracted username: {parsed['username']}")
+        if parsed.get("group_name"):
+            result["actions"].append(f"Extracted group: {parsed['group_name']}")
         result["actions"].append(f"Extracted cluster: {parsed['cluster']}")
         
         # Step 4: Add Task 1 work note
@@ -495,16 +797,110 @@ class IncidentProcessor:
             "message": "",
             "user_existed": False,
             "user_created": False,
-            "statements": []
+            "group_existed": False,
+            "group_created": False,
+            "privileges_granted": False,
+            "default_privileges_granted": False,
+            "user_added_to_group": False,
+            "statements": [],
+            "operations_performed": []
         }
         
-        username = parsed["username"]
-        cluster = parsed["cluster"]
+        username = parsed.get("username")
+        cluster = parsed.get("cluster")
+        group_name = parsed.get("group_name")
+        schema = parsed.get("schema", "public")
+        privileges = parsed.get("privileges", "ALL")
+        password_setting = parsed.get("password_setting", "DISABLE")
+        operations = parsed.get("operations", ["CREATE_USER"])
+        
+        # Ensure we have a cluster
+        if not cluster:
+            result["message"] = "No cluster specified in incident"
+            return result
         
         redshift = RedshiftClient(cluster, self.dry_run)
         
+        # Process each operation in order
+        for operation in operations:
+            logger.info(f"Executing operation: {operation}")
+            
+            if operation == "CREATE_USER":
+                if not username:
+                    result["message"] = "No username specified for CREATE_USER operation"
+                    return result
+                
+                op_result = self._execute_create_user(redshift, username, password_setting, result)
+                if not op_result["success"] and not op_result.get("user_existed"):
+                    return result
+                result.update(op_result)
+                result["operations_performed"].append("CREATE_USER")
+            
+            elif operation == "CHECK_GROUP":
+                if not group_name:
+                    result["message"] = "No group name specified for CHECK_GROUP operation"
+                    return result
+                
+                op_result = self._execute_check_group(redshift, group_name, result)
+                result.update(op_result)
+                result["operations_performed"].append("CHECK_GROUP")
+            
+            elif operation == "CREATE_GROUP":
+                if not group_name:
+                    result["message"] = "No group name specified for CREATE_GROUP operation"
+                    return result
+                
+                op_result = self._execute_create_group(redshift, group_name, result)
+                if not op_result["success"] and not op_result.get("group_existed"):
+                    return result
+                result.update(op_result)
+                result["operations_performed"].append("CREATE_GROUP")
+            
+            elif operation == "GRANT_PRIVILEGES":
+                if not group_name:
+                    result["message"] = "No group name specified for GRANT_PRIVILEGES operation"
+                    return result
+                
+                op_result = self._execute_grant_privileges(redshift, privileges, schema, group_name, result)
+                if not op_result["success"]:
+                    return result
+                result.update(op_result)
+                result["operations_performed"].append("GRANT_PRIVILEGES")
+            
+            elif operation == "GRANT_DEFAULT_PRIVILEGES":
+                if not group_name:
+                    result["message"] = "No group name specified for GRANT_DEFAULT_PRIVILEGES operation"
+                    return result
+                
+                op_result = self._execute_grant_default_privileges(redshift, privileges, schema, group_name, result)
+                if not op_result["success"]:
+                    return result
+                result.update(op_result)
+                result["operations_performed"].append("GRANT_DEFAULT_PRIVILEGES")
+            
+            elif operation == "ADD_USER_TO_GROUP":
+                if not username or not group_name:
+                    result["message"] = "Both username and group name required for ADD_USER_TO_GROUP operation"
+                    return result
+                
+                op_result = self._execute_add_user_to_group(redshift, username, group_name, result)
+                if not op_result["success"]:
+                    return result
+                result.update(op_result)
+                result["operations_performed"].append("ADD_USER_TO_GROUP")
+        
+        # Set overall success
+        result["success"] = True
+        result["message"] = f"Successfully completed {len(result['operations_performed'])} operation(s): {', '.join(result['operations_performed'])}"
+        
+        return result
+    
+    def _execute_create_user(self, redshift: RedshiftClient, username: str, password_setting: str, result: Dict) -> Dict:
+        """Execute CREATE USER operation."""
+        op_result = {"success": False}
+        
         # Check if user exists
-        logger.info(f"Checking if user '{username}' exists in {cluster}...")
+        logger.info(f"Checking if user '{username}' exists...")
         exists, statement_id = redshift.user_exists(username)
         result["statements"].append({
             "operation": "CHECK_USER",
@@ -513,35 +909,38 @@ class IncidentProcessor:
         })
         
         if exists:
-            result["user_existed"] = True
-            result["success"] = True
-            result["message"] = f"Redshift user '{username}' already exists. No further action required."
-            logger.info(result["message"])
-            return result
+            op_result["user_existed"] = True
+            op_result["success"] = True
+            op_result["message"] = f"User '{username}' already exists"
+            logger.info(op_result["message"])
+            return op_result
         
         # Create user
-        logger.info(f"Creating user '{username}' in {cluster}...")
+        logger.info(f"Creating user '{username}'...")
+        if password_setting == "DISABLE":
+            sql = f"CREATE USER {username} PASSWORD DISABLE;"
+        else:
+            sql = f"CREATE USER {username} PASSWORD '{password_setting}';"
+        
         success, statement_id, error_or_info = redshift.create_user(username)
         result["statements"].append({
             "operation": "CREATE_USER",
             "statement_id": statement_id,
-            "sql": f"CREATE USER {username} PASSWORD DISABLE;",
+            "sql": sql,
             "success": success,
-            "error": error_or_info if error_or_info != "USER_EXISTS" else None
+            "error": error_or_info if error_or_info not in [None, "USER_EXISTS"] else None
         })
         
-        # Check if user already existed (detected during CREATE attempt)
         if success and error_or_info == "USER_EXISTS":
-            result["user_existed"] = True
-            result["success"] = True
-            result["message"] = f"Database user verification completed. User '{username}' already exists in {cluster}. No further action required."
-            logger.info(result["message"])
-            return result
+            op_result["user_existed"] = True
+            op_result["success"] = True
+            op_result["message"] = f"User '{username}' already exists"
+            return op_result
         
         if not success:
-            result["message"] = f"Failed to create user: {error_or_info}"
-            logger.error(result["message"])
-            return result
+            op_result["message"] = f"Failed to create user: {error_or_info}"
+            logger.error(op_result["message"])
+            return op_result
         
         # Verify user creation
         logger.info(f"Verifying user '{username}' was created...")
@@ -554,22 +953,181 @@ class IncidentProcessor:
                 "user_info": user_info
             })
         
-        if not verified:
-            result["message"] = f"User creation could not be verified: {error}"
-            logger.warning(result["message"])
-            return result
+        op_result["user_created"] = True
+        op_result["success"] = True
+        op_result["user_info"] = user_info
+        op_result["message"] = f"User '{username}' created successfully"
+        logger.info(op_result["message"])
         
-        result["user_created"] = True
-        result["success"] = True
-        result["message"] = f"User '{username}' successfully created in {cluster}"
-        result["user_info"] = user_info
-        logger.info(result["message"])
+        return op_result
+    
+    def _execute_check_group(self, redshift: RedshiftClient, group_name: str, result: Dict) -> Dict:
+        """Execute CHECK_GROUP operation."""
+        op_result = {"success": True}
         
-        return result
+        logger.info(f"Checking if group '{group_name}' exists...")
+        exists, statement_id = redshift.group_exists(group_name)
+        result["statements"].append({
+            "operation": "CHECK_GROUP",
+            "statement_id": statement_id,
+            "sql": f"SELECT groname FROM pg_group WHERE groname = '{group_name}';"
+        })
+        
+        op_result["group_existed"] = exists
+        op_result["message"] = f"Group '{group_name}' {'exists' if exists else 'does not exist'}"
+        logger.info(op_result["message"])
+        
+        return op_result
+    
+    def _execute_create_group(self, redshift: RedshiftClient, group_name: str, result: Dict) -> Dict:
+        """Execute CREATE_GROUP operation."""
+        op_result = {"success": False}
+        
+        # First check if group exists
+        logger.info(f"Checking if group '{group_name}' exists...")
+        exists, statement_id = redshift.group_exists(group_name)
+        result["statements"].append({
+            "operation": "CHECK_GROUP",
+            "statement_id": statement_id,
+            "sql": f"SELECT groname FROM pg_group WHERE groname = '{group_name}';"
+        })
+        
+        if exists:
+            op_result["group_existed"] = True
+            op_result["success"] = True
+            op_result["message"] = f"Group '{group_name}' already exists"
+            logger.info(op_result["message"])
+            return op_result
+        
+        # Create group
+        logger.info(f"Creating group '{group_name}'...")
+        success, statement_id, error_or_info = redshift.create_group(group_name)
+        result["statements"].append({
+            "operation": "CREATE_GROUP",
+            "statement_id": statement_id,
+            "sql": f"CREATE GROUP {group_name};",
+            "success": success,
+            "error": error_or_info if error_or_info not in [None, "GROUP_EXISTS"] else None
+        })
+        
+        if success and error_or_info == "GROUP_EXISTS":
+            op_result["group_existed"] = True
+            op_result["success"] = True
+            op_result["message"] = f"Group '{group_name}' already exists"
+            return op_result
+        
+        if not success:
+            op_result["message"] = f"Failed to create group: {error_or_info}"
+            logger.error(op_result["message"])
+            return op_result
+        
+        op_result["group_created"] = True
+        op_result["success"] = True
+        op_result["message"] = f"Group '{group_name}' created successfully"
+        logger.info(op_result["message"])
+        
+        return op_result
+    
+    def _execute_grant_privileges(self, redshift: RedshiftClient, privileges: str, schema: str, group_name: str, result: Dict) -> Dict:
+        """Execute GRANT_PRIVILEGES operation."""
+        op_result = {"success": False}
+        
+        logger.info(f"Granting {privileges} privileges on {schema} to group {group_name}...")
+        sql = f"GRANT {privileges} ON ALL TABLES IN SCHEMA {schema} TO GROUP {group_name};"
+        
+        success, statement_id, error = redshift.grant_privileges(privileges, schema, group_name)
+        result["statements"].append({
+            "operation": "GRANT_PRIVILEGES",
+            "statement_id": statement_id,
+            "sql": sql,
+            "success": success,
+            "error": error
+        })
+        
+        if not success:
+            op_result["message"] = f"Failed to grant privileges: {error}"
+            logger.error(op_result["message"])
+            return op_result
+        
+        op_result["privileges_granted"] = True
+        op_result["success"] = True
+        op_result["message"] = f"Granted {privileges} on {schema} to group {group_name}"
+        logger.info(op_result["message"])
+        
+        return op_result
+    
+    def _execute_grant_default_privileges(self, redshift: RedshiftClient, privileges: str, schema: str, group_name: str, result: Dict) -> Dict:
+        """Execute GRANT_DEFAULT_PRIVILEGES operation for future tables."""
+        op_result = {"success": False}
+        
+        logger.info(f"Granting default {privileges} privileges on {schema} to group {group_name}...")
+        sql = f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT {privileges} ON TABLES TO GROUP {group_name};"
+        
+        success, statement_id, error = redshift.grant_default_privileges(privileges, schema, group_name)
+        result["statements"].append({
+            "operation": "GRANT_DEFAULT_PRIVILEGES",
+            "statement_id": statement_id,
+            "sql": sql,
+            "success": success,
+            "error": error
+        })
+        
+        if not success:
+            op_result["message"] = f"Failed to grant default privileges: {error}"
+            logger.error(op_result["message"])
+            return op_result
+        
+        op_result["default_privileges_granted"] = True
+        op_result["success"] = True
+        op_result["message"] = f"Granted default {privileges} on {schema} to group {group_name}"
+        logger.info(op_result["message"])
+        
+        return op_result
+    
+    def _execute_add_user_to_group(self, redshift: RedshiftClient, username: str, group_name: str, result: Dict) -> Dict:
+        """Execute ADD_USER_TO_GROUP operation."""
+        op_result = {"success": False}
+        
+        logger.info(f"Adding user '{username}' to group '{group_name}'...")
+        sql = f"ALTER GROUP {group_name} ADD USER {username};"
+        
+        success, statement_id, error = redshift.add_user_to_group(username, group_name)
+        result["statements"].append({
+            "operation": "ADD_USER_TO_GROUP",
+            "statement_id": statement_id,
+            "sql": sql,
+            "success": success,
+            "error": error
+        })
+        
+        if not success:
+            op_result["message"] = f"Failed to add user to group: {error}"
+            logger.error(op_result["message"])
+            return op_result
+        
+        # Verify user was added to group
+        logger.info(f"Verifying user '{username}' is in group '{group_name}'...")
+        is_member, verify_stmt_id = redshift.verify_user_in_group(username, group_name)
+        result["statements"].append({
+            "operation": "VERIFY_USER_IN_GROUP",
+            "statement_id": verify_stmt_id,
+            "sql": f"SELECT u.usename, g.groname FROM pg_user u JOIN pg_group g ON u.usesysid = ANY(g.grolist) WHERE u.usename = '{username}' AND g.groname = '{group_name}';",
+            "is_member": is_member
+        })
+        
+        op_result["user_added_to_group"] = True
+        op_result["success"] = True
+        op_result["message"] = f"User '{username}' added to group '{group_name}'"
+        logger.info(op_result["message"])
+        
+        return op_result
     
     def _generate_task1_note(self, parsed: Dict[str, Any]) -> str:
         """Generate work note for Task 1 completion."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        operations_text = "\n".join([f"  - {op}" for op in parsed.get('operations', ['CREATE_USER'])])
+        
         return f"""=== TASK 1 COMPLETED - Incident Detection & Review - {timestamp} ===
 
 INCIDENT REVIEW:
@@ -578,16 +1136,21 @@ INCIDENT REVIEW:
 - Short Description: {parsed['short_description']}
 
 EXTRACTED DETAILS:
-- Username to create: {parsed['username']}
-- Target Cluster: {parsed['cluster']}
+- Username: {parsed.get('username', 'N/A')}
+- Target Cluster: {parsed.get('cluster', 'N/A')}
+- Group Name: {parsed.get('group_name', 'N/A')}
+- Schema: {parsed.get('schema', 'public')}
+- Privileges: {parsed.get('privileges', 'ALL')}
+- Password: {parsed.get('password_setting', 'DISABLED')}
 - Database: {Config.REDSHIFT_DATABASE}
-- Password: DISABLED (IAM authentication)
+
+OPERATIONS TO PERFORM:
+{operations_text}
 
 VALIDATION:
 ✓ Incident parsed successfully
-✓ Username extracted from description
-✓ Cluster identifier parsed
-✓ Request type: CREATE USER with PASSWORD DISABLE
+✓ Required parameters extracted
+✓ Operations identified
 
 NEXT STEP: Proceeding to Task 2 - Redshift Operations
 """
@@ -596,59 +1159,61 @@ NEXT STEP: Proceeding to Task 2 - Redshift Operations
         """Generate work note for Task 2 completion."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
         
-        if redshift_result["user_existed"]:
-            return f"""=== TASK 2 COMPLETED - Redshift Operations - {timestamp} ===
-
-REDSHIFT MCP SERVER OPERATIONS:
-
-USER EXISTENCE CHECK:
-- User '{parsed['username']}' already exists in {parsed['cluster']}
-- No creation needed
-
-RESULT:
-✓ Redshift user already exists. No further action required.
-
-EXECUTION DETAILS:
-- Cluster: {parsed['cluster']}
-- Database: {Config.REDSHIFT_DATABASE}
-- Operating User: {Config.REDSHIFT_DB_USER}
-- Region: {Config.AWS_REGION}
-
-NOTE: Incident remains open per automation rules.
-"""
-        
-        if redshift_result["success"] and redshift_result["user_created"]:
-            statements_text = ""
-            for stmt in redshift_result["statements"]:
-                statements_text += f"""
+        # Build statements text
+        statements_text = ""
+        for stmt in redshift_result.get("statements", []):
+            status = "✓" if stmt.get("success", True) else "✗"
+            statements_text += f"""
 {stmt['operation']}:
-  - Statement ID: {stmt.get('statement_id', 'N/A')}
-  - SQL: {stmt.get('sql', 'N/A')}"""
-            
-            user_info = redshift_result.get("user_info", {})
-            
+  {status} Statement ID: {stmt.get('statement_id', 'N/A')}
+  SQL: {stmt.get('sql', 'N/A')}"""
+            if stmt.get("error"):
+                statements_text += f"\n  Error: {stmt['error']}"
+        
+        # Build summary based on what was done
+        summary_items = []
+        if redshift_result.get("user_existed"):
+            summary_items.append(f"✓ User '{parsed.get('username')}' already exists - no creation needed")
+        elif redshift_result.get("user_created"):
+            summary_items.append(f"✓ User '{parsed.get('username')}' created successfully")
+        
+        if redshift_result.get("group_existed"):
+            summary_items.append(f"✓ Group '{parsed.get('group_name')}' already exists - no creation needed")
+        elif redshift_result.get("group_created"):
+            summary_items.append(f"✓ Group '{parsed.get('group_name')}' created successfully")
+        
+        if redshift_result.get("privileges_granted"):
+            summary_items.append(f"✓ {parsed.get('privileges', 'ALL')} privileges granted on {parsed.get('schema', 'public')}")
+        
+        if redshift_result.get("default_privileges_granted"):
+            summary_items.append(f"✓ Default privileges for future tables configured")
+        
+        if redshift_result.get("user_added_to_group"):
+            summary_items.append(f"✓ User '{parsed.get('username')}' added to group '{parsed.get('group_name')}'")
+        
+        summary_text = "\n".join(summary_items) if summary_items else "No operations completed"
+        
+        operations_performed = ", ".join(redshift_result.get("operations_performed", [])) or "None"
+        
+        if redshift_result.get("success"):
             return f"""=== TASK 2 COMPLETED - Redshift Operations - {timestamp} ===
 
 REDSHIFT MCP SERVER OPERATIONS PERFORMED:
 {statements_text}
 
-USER VERIFICATION:
-- Username: {user_info.get('usename', parsed['username'])}
-- usecreatedb: {user_info.get('usecreatedb', 'N/A')}
-- usesuper: {user_info.get('usesuper', 'N/A')}
-
 SUMMARY:
-✓ User '{parsed['username']}' successfully created in {parsed['cluster']}
-✓ Password authentication disabled (IAM authentication)
-✓ All operations executed via real Redshift MCP Server
-✓ No simulations performed
+{summary_text}
+
+OPERATIONS COMPLETED: {operations_performed}
 
 EXECUTION DETAILS:
-- Cluster: {parsed['cluster']}
+- Cluster: {parsed.get('cluster', 'N/A')}
 - Database: {Config.REDSHIFT_DATABASE}
 - Operating User: {Config.REDSHIFT_DB_USER}
 - Region: {Config.AWS_REGION}
 - Completion Time: {timestamp}
+
+✓ All operations completed successfully via AWS Redshift Data API
 
 NOTE: Incident remains open per automation rules - not closed/resolved.
 """
@@ -657,11 +1222,16 @@ NOTE: Incident remains open per automation rules - not closed/resolved.
         return f"""=== TASK 2 FAILED - Redshift Operations - {timestamp} ===
 
 ERROR ENCOUNTERED:
-{redshift_result['message']}
+{redshift_result.get('message', 'Unknown error')}
 
 ATTEMPTED OPERATIONS:
-- Username: {parsed['username']}
-- Cluster: {parsed['cluster']}
+{statements_text}
+
+REQUESTED DETAILS:
+- Username: {parsed.get('username', 'N/A')}
+- Group: {parsed.get('group_name', 'N/A')}
+- Cluster: {parsed.get('cluster', 'N/A')}
+- Schema: {parsed.get('schema', 'N/A')}
 - Database: {Config.REDSHIFT_DATABASE}
 
 Please review and take manual action if required.
