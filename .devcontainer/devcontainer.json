@@ -25,7 +25,10 @@
         "ms-azuretools.vscode-docker",
         "saoudrizwan.claude-dev",
         "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode"
+        "esbenp.prettier-vscode",
+        "dbtlabsinc.dbt",
+        "innoverio.vscode-dbt-power-user",
+        "alexcvzz.vscode-sqlite"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/workspaces/sample-workflow/servicenow-mcp/.venv/bin/python",

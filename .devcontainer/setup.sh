@@ -202,6 +202,16 @@ if [ -d "/workspaces/sample-workflow/magic-mcp" ]; then
     source .venv/bin/activate
 fi
 
+# Install dbt (data build tool)
+echo "📦 Installing dbt Fusion Engine..."
+curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update || true
+echo "✅ dbt installed: $(~/.local/bin/dbt --version 2>/dev/null || echo 'not found')"
+
+# Add dbt to PATH in bashrc if not already there
+if ! grep -q '.local/bin' ~/.bashrc 2>/dev/null; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+fi
+
 # Install 21st-dev CLI globally for Cline integration
 echo "📦 Installing 21st-dev CLI for Cline..."
 npm install -g @21st-dev/cli@latest || true

@@ -102,6 +102,14 @@ else
     echo "❌ npx not found"
 fi
 
+# Verify dbt
+if [ -f "$HOME/.local/bin/dbt" ]; then
+    echo "✅ dbt: $($HOME/.local/bin/dbt --version 2>/dev/null || echo 'installed')"
+else
+    echo "⚠️  dbt not found, installing..."
+    curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update || true
+fi
+
 # Verify MAGIC_API_KEY
 if [ -n "$MAGIC_API_KEY" ]; then
     echo "✅ MAGIC_API_KEY: configured"
@@ -118,7 +126,16 @@ echo "📋 Database files:"
 if [ -f "$PROJECT_PATH/web_ui/auth.db" ]; then
     echo "✅ Authentication database: $PROJECT_PATH/web_ui/auth.db"
 else
-    echo "ℹ️  Authentication database will be created on first run"
+    echo "ℹ️  Initializing authentication database..."
+    # Initialize the database with default users
+    cd "$PROJECT_PATH"
+    python3 -c "
+import sys
+sys.path.insert(0, 'web_ui')
+import database
+database.init_db()
+print('Database initialized successfully')
+" || echo "⚠️  Database will be created on first web UI run"
 fi
 
 echo ""
