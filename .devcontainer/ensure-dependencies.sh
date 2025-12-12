@@ -1,13 +1,19 @@
 #!/bin/bash
 # Script to ensure all ServiceNow MCP dependencies are installed
 # This can be run manually or automatically on codespace start
+# Call this script in: postCreateCommand, postStartCommand, postAttachCommand
+# Usage: bash .devcontainer/ensure-dependencies.sh
 
 set -e
 
 VENV_PATH="/workspaces/sample-workflow/servicenow-mcp/.venv"
 PROJECT_PATH="/workspaces/sample-workflow/servicenow-mcp"
 
+echo ""
+echo "════════════════════════════════════════════════════════════════"
 echo "🔍 Checking ServiceNow MCP dependencies..."
+echo "════════════════════════════════════════════════════════════════"
+echo ""
 
 # Check if virtual environment exists
 if [ ! -d "$VENV_PATH" ]; then
