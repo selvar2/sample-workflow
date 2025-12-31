@@ -131,9 +131,38 @@ EOF
     chmod 600 ~/.aws/credentials
 fi
 
-# Install Redshift MCP server using uvx
-echo "📦 Installing Redshift MCP server..."
-~/.cargo/bin/uvx awslabs.redshift-mcp-server@latest --help || true
+# Install Terraform CLI (for workflow execution)
+echo "📦 Installing Terraform CLI..."
+if ! command -v terraform &> /dev/null; then
+    sudo apt-get install -y gnupg software-properties-common curl lsb-release || true
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg 2>/dev/null || true
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
+    sudo apt-get update -y && sudo apt-get install -y terraform
+    echo "✅ Terraform installed: $(terraform -version | head -n1)"
+else
+    echo "✅ Terraform already installed: $(terraform -version | head -n1)"
+fi
+
+# Install Checkov (for security scanning)
+echo "📦 Installing Checkov..."
+if ! command -v checkov &> /dev/null; then
+    pip install checkov || true
+    echo "✅ Checkov installed: $(checkov --version 2>/dev/null || echo 'installed')"
+else
+    echo "✅ Checkov already installed: $(checkov --version 2>/dev/null || echo 'installed')"
+fi
+
+# Install MCP servers using uv tool install (adds to PATH)
+echo "📦 Installing MCP servers via uv tool install..."
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+for server in awslabs.redshift-mcp-server awslabs.iam-mcp-server awslabs.terraform-mcp-server; do
+    if ! command -v "$server" &> /dev/null; then
+        echo "  Installing $server..."
+        uv tool install "$server" 2>/dev/null || true
+    else
+        echo "  ✅ $server already installed"
+    fi
+done
 
 # Create helper aliases
 echo "🔗 Creating helper aliases..."

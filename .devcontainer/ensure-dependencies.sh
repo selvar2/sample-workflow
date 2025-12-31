@@ -79,6 +79,63 @@ else
     echo "✅ pnpm: $(pnpm --version)"
 fi
 
+# Ensure uv is installed (used for MCP servers and Python dependency management)
+if ! command -v uv &> /dev/null; then
+    echo "⚠️  uv not found — installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh || true
+    export PATH="$HOME/.cargo/bin:$PATH"
+    if command -v uv &> /dev/null; then
+        echo "✅ uv installed: $(uv --version 2>/dev/null || echo 'unknown')"
+    else
+        echo "❌ uv installation failed"
+    fi
+else
+    echo "✅ uv found: $(uv --version 2>/dev/null || echo 'unknown')"
+fi
+
+# Ensure commonly-used MCP servers are available (idempotent)
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+for server in awslabs.iam-mcp-server awslabs.redshift-mcp-server awslabs.terraform-mcp-server; do
+    if ! command -v "$server" &> /dev/null; then
+        echo "⚠️  $server not found — installing via uv tool install..."
+        uv tool install "$server" 2>/dev/null || true
+    fi
+    if command -v "$server" &> /dev/null; then
+        echo "✅ $server available: $(which "$server")"
+    else
+        echo "⚠️  $server could not be installed (will use uvx on-demand)"
+    fi
+done
+
+# Verify Terraform CLI
+if ! command -v terraform &> /dev/null; then
+    echo "⚠️  Terraform CLI not found — installing..."
+    sudo apt-get install -y gnupg software-properties-common curl lsb-release 2>/dev/null || true
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg 2>/dev/null || true
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
+    sudo apt-get update -y && sudo apt-get install -y terraform 2>/dev/null || true
+    if command -v terraform &> /dev/null; then
+        echo "✅ Terraform: $(terraform -version | head -n1)"
+    else
+        echo "❌ Terraform installation failed"
+    fi
+else
+    echo "✅ Terraform: $(terraform -version | head -n1)"
+fi
+
+# Verify Checkov
+if ! command -v checkov &> /dev/null; then
+    echo "⚠️  Checkov not found — installing..."
+    pip install checkov 2>/dev/null || true
+    if command -v checkov &> /dev/null; then
+        echo "✅ Checkov: $(checkov --version 2>/dev/null || echo 'installed')"
+    else
+        echo "❌ Checkov installation failed"
+    fi
+else
+    echo "✅ Checkov: $(checkov --version 2>/dev/null || echo 'installed')"
+fi
+
 # Verify SQLite
 if ! command -v sqlite3 &> /dev/null; then
     echo "❌ SQLite3 CLI not found"
