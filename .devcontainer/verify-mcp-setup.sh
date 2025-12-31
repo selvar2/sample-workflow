@@ -145,6 +145,15 @@ else
     print_status 1 "Cannot test Redshift MCP server (uvx not working)"
 fi
 
+# 10. Check IAM MCP server availability
+echo ""
+echo "📍 Checking IAM MCP server..."
+if command -v awslabs.iam-mcp-server &> /dev/null; then
+    print_status 0 "IAM MCP server installed: $(which awslabs.iam-mcp-server)"
+else
+    print_warning "IAM MCP server is not installed — it will be auto-installed on first use or by .devcontainer/scripts"
+fi
+
 # 10. Check Redshift cluster availability
 echo ""
 echo "📍 Checking Redshift cluster..."
