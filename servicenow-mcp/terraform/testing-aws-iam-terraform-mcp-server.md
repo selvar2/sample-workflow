@@ -505,5 +505,5 @@ This guide documents the complete process of:
 
 ---
 
-> **Author:** GitHub Copilot  
+
 > **Last Updated:** December 31, 2025
