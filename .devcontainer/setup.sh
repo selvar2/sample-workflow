@@ -21,6 +21,11 @@ sudo apt-get install -y \
     sqlite3 \
     libsqlite3-dev
 
+# Create local bin directory for user scripts
+echo "📁 Creating local bin directory..."
+mkdir -p ~/.local/bin
+export PATH="$HOME/.local/bin:$PATH"
+
 # Install Node.js 20.x for AG-UI
 echo "📦 Installing Node.js 20.x for AG-UI..."
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -

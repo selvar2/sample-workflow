@@ -37,7 +37,7 @@
     }
   },
 
-  "postCreateCommand": "bash .devcontainer/setup.sh && bash .devcontainer/ensure-dependencies.sh",
+  "postCreateCommand": "bash .devcontainer/setup.sh && bash .devcontainer/ensure-dependencies.sh && bash .devcontainer/setup-jules.sh",
   "postStartCommand": "bash .devcontainer/ensure-dependencies.sh && cd /workspaces/sample-workflow/servicenow-mcp && [ -d .venv ] && (.venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv boto3 flask flask-cors bcrypt) || (python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv boto3 flask flask-cors bcrypt)",
   "postAttachCommand": "bash .devcontainer/ensure-dependencies.sh && cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate",
   
@@ -51,7 +51,8 @@
     "AWS_ACCESS_KEY_ID": "${localEnv:AWS_ACCESS_KEY_ID}",
     "AWS_SECRET_ACCESS_KEY": "${localEnv:AWS_SECRET_ACCESS_KEY}",
     "FASTMCP_LOG_LEVEL": "INFO",
-    "MAGIC_API_KEY": "${localEnv:MAGIC_API_KEY}"
+    "MAGIC_API_KEY": "${localEnv:MAGIC_API_KEY}",
+    "JULES_OAUTH_CREDS": "${localEnv:JULES_OAUTH_CREDS}"
   },
 
   "mounts": [
