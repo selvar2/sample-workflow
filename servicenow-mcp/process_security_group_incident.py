@@ -182,6 +182,7 @@ def parse_security_group_request(description: str) -> Dict[str, Any]:
     """
     Parse security group operation details from incident description.
     Supports: add/remove/modify inbound/outbound rules, multiple clusters, regions.
+    Supports multiple CIDRs in any format (comma, space, newline separated).
     """
     result = {
         "operation": None,
@@ -191,6 +192,7 @@ def parse_security_group_request(description: str) -> Dict[str, Any]:
         "vpc_id": None,
         "region": "us-east-1",
         "cidr": None,
+        "cidrs": [],  # Support for multiple CIDRs
         "port": None,
         "port_range_end": None,
         "protocol": "tcp",
@@ -255,17 +257,26 @@ def parse_security_group_request(description: str) -> Dict[str, Any]:
     if region_match:
         result["region"] = region_match.group(1)
     
-    # Extract CIDR range
-    cidr_patterns = [
-        r'cidr\s+(?:range\s+)?(?:to\s+be\s+)?(?:added|removed)?\s*[:\s]+\s*(\d+\.\d+\.\d+\.\d+/\d+)',
-        r'cidr\s*[:\s]+\s*(\d+\.\d+\.\d+\.\d+/\d+)',
-        r'(\d+\.\d+\.\d+\.\d+/\d+)'
-    ]
-    for pattern in cidr_patterns:
-        match = re.search(pattern, description, re.IGNORECASE)
-        if match:
-            result["cidr"] = match.group(1)
-            break
+    # Extract ALL CIDR ranges - supports multiple formats:
+    # - Comma separated: 17.0.0.0/8, 18.0.0.0/8
+    # - Space separated: 17.0.0.0/8 18.0.0.0/8
+    # - Newline separated: 17.0.0.0/8\n18.0.0.0/8
+    # - Mixed formats
+    cidr_pattern = r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2})\b'
+    all_cidrs = re.findall(cidr_pattern, description)
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_cidrs = []
+    for cidr in all_cidrs:
+        if cidr not in seen:
+            seen.add(cidr)
+            unique_cidrs.append(cidr)
+    
+    result["cidrs"] = unique_cidrs
+    # For backward compatibility, set first CIDR as "cidr"
+    if unique_cidrs:
+        result["cidr"] = unique_cidrs[0]
     
     # Extract port
     port_match = re.search(r'port\s*[:\s]+\s*(\d+)', description, re.IGNORECASE)
@@ -310,7 +321,7 @@ def parse_security_group_request(description: str) -> Dict[str, Any]:
             result["description"] = desc_text
     
     if not result["description"]:
-        result["description"] = "Added by MCP server"
+        result["description"] = "MCP Server Automation"
     
     return result
 
@@ -441,7 +452,7 @@ resource "aws_security_group_rule" "{sg_name.replace('-', '_')}_change" {{
   protocol          = "{change_details.get('protocol', 'tcp')}"
   cidr_blocks       = ["{change_details.get('cidr', '0.0.0.0/0')}"]
   security_group_id = aws_security_group.{sg_name.replace('-', '_')}.id
-  description       = "{change_details.get('description', 'Added by MCP server')}"
+  description       = "{change_details.get('description', 'MCP Server Automation')}"
 }}
 ```
 
@@ -526,7 +537,7 @@ def add_inbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
     port = sg_details["port"]
     port_end = sg_details.get("port_range_end", port)
     protocol = sg_details["protocol"]
-    description = sg_details.get("description", "Added by MCP server")
+    description = sg_details.get("description", "MCP Server Automation")
     
     ip_permissions = json.dumps([{
         "IpProtocol": protocol,
@@ -569,7 +580,7 @@ def add_outbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
     port = sg_details["port"]
     port_end = sg_details.get("port_range_end", port)
     protocol = sg_details["protocol"]
-    description = sg_details.get("description", "Added by MCP server")
+    description = sg_details.get("description", "MCP Server Automation")
     
     ip_permissions = json.dumps([{
         "IpProtocol": protocol,
@@ -702,18 +713,23 @@ def process_incident(incident_number: str) -> bool:
         print("✗ Could not find security group ID")
         return False
     
-    if not sg_request["cidr"]:
-        print("✗ Could not find CIDR range")
+    if not sg_request["cidrs"]:
+        print("✗ Could not find any CIDR range")
         return False
     
     if not sg_request["port"]:
         print("✗ Could not find port")
         return False
     
+    # Display all detected CIDRs
+    cidr_count = len(sg_request["cidrs"])
     print(f"✓ Parsed operation: {sg_request['operation']}")
     print(f"  Security Group: {sg_request['security_group_id']}")
     print(f"  Region: {sg_request['region']}")
-    print(f"  CIDR: {sg_request['cidr']}, Port: {sg_request['port']}")
+    print(f"  CIDRs detected: {cidr_count}")
+    for i, cidr in enumerate(sg_request["cidrs"], 1):
+        print(f"    {i}. {cidr}")
+    print(f"  Port: {sg_request['port']}")
     
     # Step 3: Verify security group exists
     print(f"\n[Step 3] Verifying security group...")
@@ -741,41 +757,14 @@ def process_incident(incident_number: str) -> bool:
     else:
         print(f"\n[Step 4] Skipping cluster verification (not specified)")
     
-    # Step 5: Check if rule already exists (for add operations)
-    if "add" in sg_request["operation"]:
-        print(f"\n[Step 5] Checking for existing rule...")
-        rule_exists, existing_rule = check_rule_exists(
-            sg_request["security_group_id"], sg_request["region"],
-            sg_request["cidr"], sg_request["port"], sg_request["protocol"]
-        )
-        
-        if rule_exists:
-            print(f"⚠ Rule already exists - no action taken")
-            print(f"  Existing Rule ID: {existing_rule.get('SecurityGroupRuleId', 'N/A')}")
-            
-            # Update incident
-            work_notes = f"""No Action Required - Rule Already Exists
-
-Existing Rule: {existing_rule.get('SecurityGroupRuleId', 'N/A')}
-CIDR: {sg_request['cidr']}, Port: {sg_request['port']}
-
-MCP Server v2.0.0"""
-            update_params = UpdateIncidentParams(incident_id=incident_number, work_notes=work_notes, state="2")
-            update_incident(config, auth_manager, update_params)
-            return True
-        
-        print(f"✓ No existing rule found - proceeding")
-    else:
-        print(f"\n[Step 5] Skipping duplicate check (not add operation)")
-    
-    # Step 6: Capture before state
-    print(f"\n[Step 6] Capturing before state...")
+    # Step 5: Capture before state
+    print(f"\n[Step 5] Capturing before state...")
     before_result = get_security_group_rules(sg_request["security_group_id"], sg_request["region"])
     before_rules = before_result.get("all_rules", []) if before_result["success"] else []
     print(f"✓ Captured {len(before_rules)} existing rules")
     
-    # Step 7: Execute operation
-    print(f"\n[Step 7] Executing: {sg_request['operation']}...")
+    # Step 6: Process each CIDR
+    print(f"\n[Step 6] Processing {len(sg_request['cidrs'])} CIDR(s)...")
     
     operation_map = {
         "add_inbound_rule": add_inbound_rule,
@@ -788,29 +777,72 @@ MCP Server v2.0.0"""
         print(f"✗ Unsupported operation: {sg_request['operation']}")
         return False
     
-    operation_result = operation_map[sg_request["operation"]](sg_request)
+    # Track results for each CIDR
+    results = []
+    rule_direction = "Inbound" if "inbound" in sg_request['operation'] else "Outbound"
+    action_verb = "ADDED" if "add" in sg_request['operation'] else "REMOVED"
     
-    if operation_result["success"]:
-        print(f"✓ {operation_result['message']}")
-        if operation_result.get("rule_id"):
-            print(f"  Rule ID: {operation_result['rule_id']}")
-    else:
-        print(f"✗ {operation_result['message']}")
+    for idx, cidr in enumerate(sg_request["cidrs"], 1):
+        print(f"\n  [{idx}/{len(sg_request['cidrs'])}] Processing CIDR: {cidr}")
+        
+        # Check if rule already exists (for add operations)
+        if "add" in sg_request["operation"]:
+            rule_exists, existing_rule = check_rule_exists(
+                sg_request["security_group_id"], sg_request["region"],
+                cidr, sg_request["port"], sg_request["protocol"]
+            )
+            
+            if rule_exists:
+                print(f"      ⚠ Rule already exists - skipping")
+                results.append({
+                    "cidr": cidr,
+                    "status": "skipped",
+                    "message": "Rule already exists",
+                    "rule_id": existing_rule.get('SecurityGroupRuleId', 'N/A')
+                })
+                continue
+        
+        # Create a copy of sg_request with current CIDR
+        current_request = sg_request.copy()
+        current_request["cidr"] = cidr
+        
+        # Execute operation
+        operation_result = operation_map[sg_request["operation"]](current_request)
+        
+        if operation_result["success"]:
+            print(f"      ✓ {rule_direction} rule {action_verb.lower()}")
+            if operation_result.get("rule_id"):
+                print(f"        Rule ID: {operation_result['rule_id']}")
+            results.append({
+                "cidr": cidr,
+                "status": "success",
+                "message": operation_result['message'],
+                "rule_id": operation_result.get('rule_id', 'N/A')
+            })
+        else:
+            print(f"      ✗ Failed: {operation_result['message']}")
+            results.append({
+                "cidr": cidr,
+                "status": "failed",
+                "message": operation_result['message'],
+                "rule_id": None
+            })
     
-    # Step 8: Capture after state
-    print(f"\n[Step 8] Capturing after state...")
+    # Step 7: Capture after state
+    print(f"\n[Step 7] Capturing after state...")
     after_result = get_security_group_rules(sg_request["security_group_id"], sg_request["region"])
     after_rules = after_result.get("all_rules", []) if after_result["success"] else []
     print(f"✓ Captured {len(after_rules)} rules after operation")
     
-    # Step 9: Generate backup
-    print(f"\n[Step 9] Generating Terraform backup...")
+    # Step 8: Generate backup
+    print(f"\n[Step 8] Generating Terraform backup...")
+    # Use all CIDRs for change details
     change_details = {
-        "cidr": sg_request["cidr"],
+        "cidr": ", ".join(sg_request["cidrs"]),
         "port": sg_request["port"],
         "port_range_end": sg_request.get("port_range_end", sg_request["port"]),
         "protocol": sg_request["protocol"],
-        "description": sg_request.get("description", "Added by MCP server"),
+        "description": sg_request.get("description", "MCP Server Automation"),
         "region": sg_request["region"]
     }
     
@@ -820,27 +852,53 @@ MCP Server v2.0.0"""
     )
     print(f"✓ Backup saved: {backup_file}")
     
-    # Step 10: Update incident
-    print(f"\n[Step 10] Updating incident...")
+    # Step 9: Update incident with consolidated results
+    print(f"\n[Step 9] Updating incident...")
     completion_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    status = "Success" if operation_result["success"] else "Failed"
     
-    work_notes = f"""Security Group Operation Completed
-
-Operation: {sg_request['operation'].replace('_', ' ').title()}
-Status: {status}
-
-Details:
-- Security Group: {sg_request['security_group_id']} ({sg_info.get('security_group_name', 'N/A')})
-- Region: {sg_request['region']}
-- CIDR: {sg_request['cidr']}, Port: {sg_request['port']}
-{f"- Rule ID: {operation_result.get('rule_id', 'N/A')}" if operation_result.get('rule_id') else ''}
-
-Backup: {os.path.basename(backup_file)}
-Timestamp: {completion_time}
-
-MCP Server v2.0.0"""
-
+    # Count results
+    success_count = sum(1 for r in results if r["status"] == "success")
+    skipped_count = sum(1 for r in results if r["status"] == "skipped")
+    failed_count = sum(1 for r in results if r["status"] == "failed")
+    total_count = len(results)
+    
+    # Build work notes with all results
+    work_notes_lines = [
+        "═══════════════════════════════════════════",
+        "Actions Performed by MCP Server Automation",
+        "═══════════════════════════════════════════",
+        "",
+        f"Total CIDRs Processed: {total_count}",
+        f"  ✓ Success: {success_count}",
+        f"  ⊘ Skipped (already exists): {skipped_count}",
+        f"  ✗ Failed: {failed_count}",
+        ""
+    ]
+    
+    # Add details for each CIDR
+    for r in results:
+        if r["status"] == "success":
+            work_notes_lines.append(f"✓ {r['cidr']}:{sg_request['port']} - {rule_direction} rule {action_verb}")
+            work_notes_lines.append(f"    Rule ID: {r['rule_id']}")
+        elif r["status"] == "skipped":
+            work_notes_lines.append(f"⊘ {r['cidr']}:{sg_request['port']} - Already exists")
+            work_notes_lines.append(f"    Existing Rule ID: {r['rule_id']}")
+        else:
+            work_notes_lines.append(f"✗ {r['cidr']}:{sg_request['port']} - Failed")
+            work_notes_lines.append(f"    Error: {r['message']}")
+    
+    work_notes_lines.extend([
+        "",
+        f"Security Group: {sg_request['security_group_id']} ({sg_info.get('security_group_name', 'N/A')})",
+        f"Region: {sg_request['region']}",
+        f"Protocol: {sg_request['protocol']}",
+        f"Description: {sg_request.get('description', 'MCP Server Automation')}",
+        f"Timestamp: {completion_time}",
+        "MCP Server Automation"
+    ])
+    
+    work_notes = "\n".join(work_notes_lines)
+    
     update_params = UpdateIncidentParams(incident_id=incident_number, work_notes=work_notes, state="2")
     update_result = update_incident(config, auth_manager, update_params)
     
@@ -855,12 +913,12 @@ MCP Server v2.0.0"""
     print("=" * 70)
     print(f"Incident: {incident_number}")
     print(f"Operation: {sg_request['operation'].replace('_', ' ').title()}")
-    print(f"Status: {status}")
+    print(f"CIDRs Processed: {total_count} (Success: {success_count}, Skipped: {skipped_count}, Failed: {failed_count})")
     print(f"Security Group: {sg_request['security_group_id']}")
     print(f"Backup: {os.path.basename(backup_file)}")
     print("=" * 70)
     
-    return operation_result["success"]
+    return failed_count == 0
 
 
 if __name__ == "__main__":
