@@ -665,10 +665,6 @@ class IncidentParser:
         # Try description first, then short description
         full_text = f"{description} {short_desc}"
         
-        # Extract assignment_group from raw incident data
-        # ServiceNow returns this as display value when sysparm_display_value=true
-        assignment_group = incident.get("assignment_group", "") or ""
-        
         # Extract all possible parameters
         parsed = {
             "incident_number": incident.get("number"),
@@ -677,7 +673,6 @@ class IncidentParser:
             "description": description,
             "created_on": incident.get("sys_created_on"),
             "state": incident.get("state"),
-            "assignment_group": assignment_group,  # ServiceNow assignment group
             "username": IncidentParser.extract_username(full_text),
             "cluster": IncidentParser.extract_cluster(full_text),
             "group_name": IncidentParser.extract_group_name(full_text),

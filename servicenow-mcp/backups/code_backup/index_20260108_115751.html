@@ -1797,12 +1797,7 @@
                             </div>
                         </div>
                     `;
-                    // Reset button so user can try another incident
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Process Incident';
-                    // Clear input so user can enter a new incident number
-                    input.value = '';
-                    input.focus();
+                    // Don't clear input so user can see which incident failed
                     return;
                 } else {
                     resultDiv.innerHTML = `

@@ -1,3 +1,9 @@
+# BACKUP: Old file before implementing WG101 group validation logic - 20260108_114746
+# This is the original file before adding:
+# - Server-side validation to check assignment_group = WG101 before processing
+# - Popup error message for non-WG101 tickets
+# Revert to this file if the new implementation causes issues
+
 #!/usr/bin/env python3
 """
 ServiceNow Incident Processor - Web User Interface
@@ -362,42 +368,10 @@ def get_incident(incident_number: str):
 @app.route('/api/process/<incident_number>', methods=['POST'])
 @login_required
 def process_incident(incident_number: str):
-    """Process a specific incident.
-    
-    Validates that the incident belongs to WG101 group before processing.
-    Returns error if incident is from a different group.
-    """
+    """Process a specific incident."""
     dry_run = request.json.get('dry_run', state.dry_run) if request.json else state.dry_run
     
     try:
-        # First, fetch the incident to validate assignment_group
-        client = ServiceNowClient()
-        incident = client.get_incident(incident_number)
-        
-        if not incident:
-            return jsonify({
-                "success": False,
-                "incident_number": incident_number,
-                "error": f"Incident {incident_number} not found",
-                "error_code": "NOT_FOUND"
-            }), 404
-        
-        # Check assignment_group - must be WG101
-        assignment_group = incident.get("assignment_group", "") or ""
-        required_group = Config.ASSIGNMENT_GROUP_FILTER  # Default: "WG101"
-        
-        if assignment_group != required_group:
-            group_display = assignment_group if assignment_group else "None (unassigned)"
-            return jsonify({
-                "success": False,
-                "incident_number": incident_number,
-                "error": f"This incident belongs to group '{group_display}'. Only incidents assigned to '{required_group} - Redshift Work Group' can be processed.",
-                "error_code": "INVALID_GROUP",
-                "current_group": assignment_group,
-                "required_group": required_group
-            }), 400
-        
-        # Proceed with processing
         processor = IncidentProcessor(dry_run=dry_run)
         result = processor.process_incident(incident_number)
         

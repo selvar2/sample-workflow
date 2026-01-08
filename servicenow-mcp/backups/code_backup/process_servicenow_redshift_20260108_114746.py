@@ -1,3 +1,9 @@
+# BACKUP: Old file before implementing WG101 group validation logic - 20260108_114746
+# This is the original file before adding:
+# - Server-side validation to check assignment_group = WG101 before processing
+# - Popup error message for non-WG101 tickets
+# Revert to this file if the new implementation causes issues
+
 #!/usr/bin/env python3
 """
 ServiceNow Incident Processor with AWS Redshift Integration
@@ -665,10 +671,6 @@ class IncidentParser:
         # Try description first, then short description
         full_text = f"{description} {short_desc}"
         
-        # Extract assignment_group from raw incident data
-        # ServiceNow returns this as display value when sysparm_display_value=true
-        assignment_group = incident.get("assignment_group", "") or ""
-        
         # Extract all possible parameters
         parsed = {
             "incident_number": incident.get("number"),
@@ -677,7 +679,6 @@ class IncidentParser:
             "description": description,
             "created_on": incident.get("sys_created_on"),
             "state": incident.get("state"),
-            "assignment_group": assignment_group,  # ServiceNow assignment group
             "username": IncidentParser.extract_username(full_text),
             "cluster": IncidentParser.extract_cluster(full_text),
             "group_name": IncidentParser.extract_group_name(full_text),
