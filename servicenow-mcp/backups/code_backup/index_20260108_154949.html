@@ -1,0 +1,2405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServiceNow Incident Processor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --primary-light: #60a5fa;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-bg: #0f172a;
+            --darker-bg: #030712;
+            --card-bg: #1e293b;
+            --card-light: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border-color: #475569;
+            --accent-color: #06b6d4;
+            --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+            --gradient-success: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        }
+
+        * {
+            transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--darker-bg) 0%, #1a1f35 50%, var(--dark-bg) 100%);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%);
+            border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 1.25rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.3rem;
+            color: var(--text-primary) !important;
+            letter-spacing: -0.5px;
+        }
+
+        .navbar-brand i {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 1.5rem;
+        }
+
+        .card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(30, 41, 59, 0.3) 100%);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card:hover {
+            border-color: rgba(59, 130, 246, 0.6);
+            box-shadow: 0 16px 48px rgba(59, 130, 246, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            background: transparent;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            letter-spacing: 0.3px;
+        }
+
+        .stat-card {
+            padding: 2rem 1.5rem;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(71, 85, 105, 0.4);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            border-color: rgba(59, 130, 246, 0.8);
+            box-shadow: 0 20px 60px rgba(59, 130, 246, 0.2);
+        }
+
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(135deg, #e0e7ff 0%, #f0f9ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 600;
+        }
+
+        .stat-card.primary .stat-value { 
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-card.success .stat-value { 
+            background: var(--gradient-success);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-card.warning .stat-value { color: var(--warning-color); }
+        .stat-card.danger .stat-value { color: var(--danger-color); }
+        .stat-card.info .stat-value { 
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Ensure all stat cards have equal height */
+        .stats-row {
+            display: flex;
+            gap: 1.5rem;
+        }
+        .stats-row > div {
+            flex: 1;
+            min-width: 0;
+        }
+        .stats-row .stat-card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 120px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            transition: all 0.3s;
+        }
+
+        .status-indicator.active {
+            background: var(--success-color);
+            animation: pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .status-indicator.inactive {
+            background: rgba(71, 85, 105, 0.6);
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                opacity: 1; 
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+            50% { 
+                opacity: 0.8; 
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .connection-status.connected {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%);
+            color: var(--success-color);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .connection-status.disconnected {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%);
+            color: var(--danger-color);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .log-container {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.4) 100%);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 350px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            border: 1px solid rgba(71, 85, 105, 0.3);
+        }
+
+        .log-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.4);
+            border-radius: 3px;
+        }
+
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.6);
+        }
+
+        .log-entry {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.1);
+            transition: all 0.2s;
+        }
+
+        .log-entry:hover {
+            background: rgba(59, 130, 246, 0.05);
+            padding-left: 0.5rem;
+            margin-left: -0.5rem;
+            padding-right: 0.5rem;
+            margin-right: -0.5rem;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-timestamp {
+            color: var(--text-secondary);
+            margin-right: 1rem;
+            font-weight: 600;
+            min-width: 90px;
+        }
+
+        .log-success { color: var(--success-color); font-weight: 600; }
+        .log-error { color: var(--danger-color); font-weight: 600; }
+        .log-info { color: var(--primary-light); }
+        .log-warning { color: var(--warning-color); }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            border: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            letter-spacing: 0.3px;
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-outline-light {
+            border-color: rgba(71, 85, 105, 0.6);
+            color: var(--text-primary);
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-outline-light:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--primary-color);
+            color: var(--text-primary);
+        }
+
+        .workflow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 2rem;
+            flex-wrap: wrap;
+            animation: slideInUp 0.6s ease-out;
+        }
+
+        .workflow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.6) 100%);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            border-radius: 12px;
+            min-width: 140px;
+            color: #ffffff;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .workflow-step::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .workflow-step:hover {
+            transform: translateY(-4px) scale(1.05);
+            border-color: rgba(59, 130, 246, 0.8);
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.2);
+        }
+
+        .workflow-step small {
+            color: #ffffff !important;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+        }
+
+        .workflow-step small.text-secondary {
+            color: rgba(203, 213, 225, 0.7) !important;
+            font-weight: 400;
+            font-size: 0.75rem;
+        }
+
+        .workflow-step i {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            position: relative;
+            z-index: 1;
+            transition: transform 0.3s;
+        }
+
+        .workflow-step:hover i {
+            transform: scale(1.2) rotate(5deg);
+        }
+
+        .workflow-step.active {
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.3), inset 0 0 40px rgba(59, 130, 246, 0.1);
+        }
+
+        .workflow-arrow {
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            animation: pulse-arrow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-arrow {
+            0%, 100% { opacity: 0.5; transform: translateX(0); }
+            50% { opacity: 1; transform: translateX(4px); }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .table {
+            color: var(--text-primary);
+        }
+
+        .table thead th {
+            border-color: rgba(71, 85, 105, 0.3);
+            color: var(--text-secondary);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            background: linear-gradient(135deg, rgba(71, 85, 105, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+        }
+
+        .table td {
+            border-color: rgba(71, 85, 105, 0.2);
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+
+        .table-hover tbody tr:hover {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%);
+            border-radius: 4px;
+        }
+
+        .badge {
+            padding: 0.4em 0.75em;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .badge-success { 
+            background: var(--success-color);
+            color: white;
+        }
+        .badge-warning { 
+            background: var(--warning-color); 
+            color: #000;
+        }
+        .badge-danger { 
+            background: var(--danger-color);
+            color: white;
+        }
+        .badge-primary { 
+            background: var(--primary-color);
+            color: white;
+        }
+        .badge-secondary { 
+            background: rgba(71, 85, 105, 0.6);
+            color: var(--text-primary);
+        }
+
+        .incident-card {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .incident-card:hover {
+            border-color: var(--primary-color);
+        }
+
+        .incident-card.selected {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .log-container {
+            background: var(--darker-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+        }
+
+        .log-entry {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-timestamp {
+            color: var(--text-secondary);
+            margin-right: 1rem;
+        }
+
+        .log-success { color: var(--success-color); }
+        .log-error { color: var(--danger-color); }
+        .log-info { color: var(--primary-color); }
+        .log-warning { color: var(--warning-color); }
+
+        .modal-content {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-header {
+            border-color: rgba(71, 85, 105, 0.3);
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .modal-footer {
+            border-color: rgba(71, 85, 105, 0.3);
+        }
+
+        .nav-tabs {
+            border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+            gap: 0;
+        }
+
+        .nav-tabs .nav-link {
+            color: var(--text-secondary);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: var(--text-primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--primary-color);
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid var(--primary-color);
+        }
+
+        .nav-tabs .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+            transition: width 0.3s ease;
+        }
+
+        .nav-tabs .nav-link:hover::after {
+            width: 100%;
+        }
+
+        .form-control, .form-select {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 0.65rem 0.95rem;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background: rgba(15, 23, 42, 0.8);
+            border-color: var(--primary-color);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+            outline: none;
+        }
+
+        .form-control::placeholder {
+            color: rgba(203, 213, 225, 0.5);
+        }
+
+        .form-label {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 0.9rem;
+            letter-spacing: 0.2px;
+            margin-bottom: 0.6rem;
+        }
+
+        .form-text {
+            color: var(--text-secondary) !important;
+            font-size: 0.85rem;
+        }
+
+        .input-group-text {
+            background: rgba(30, 41, 59, 0.6);
+            border-color: rgba(71, 85, 105, 0.4);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .form-check-input {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .form-check-input:checked {
+            background: var(--gradient-primary);
+            border-color: var(--primary-color);
+        }
+
+        .form-check-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .connection-status.connected {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .connection-status.disconnected {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .nav-tabs {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-tabs .nav-link {
+            color: var(--text-secondary);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-weight: 500;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: var(--text-primary);
+            border: none;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--primary-color);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        /* Pagination Styles */
+        .pagination {
+            margin: 0;
+        }
+        
+        .pagination .page-item .page-link {
+            background: rgba(30, 41, 59, 0.6);
+            border-color: rgba(71, 85, 105, 0.4);
+            color: var(--text-primary);
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+            min-width: 36px;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .pagination .page-item .page-link:hover {
+            background: var(--gradient-primary);
+            border-color: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .pagination .page-item.active .page-link {
+            background: var(--gradient-primary);
+            border-color: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .pagination .page-item.disabled .page-link {
+            background: rgba(30, 41, 59, 0.4);
+            border-color: rgba(71, 85, 105, 0.2);
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+        
+        .card-footer {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.3) 100%);
+            border-top: 1px solid rgba(71, 85, 105, 0.3);
+            padding: 1rem;
+            border-radius: 0 0 16px 16px;
+        }
+
+        .spinner-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 4rem 2rem;
+        }
+
+        .spinner-border {
+            border: 3px solid rgba(59, 130, 246, 0.2);
+            border-right-color: var(--primary-color);
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3.5rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            opacity: 0.6;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 1100;
+        }
+
+        .incident-card {
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 12px;
+        }
+
+        .incident-card:hover {
+            border-color: var(--primary-color);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .incident-card.selected {
+            border-color: var(--primary-color);
+            background: rgba(59, 130, 246, 0.15);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+        }
+
+        /* Dropdown menu styles */
+        .dropdown-menu-dark {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .dropdown-menu-dark .dropdown-item {
+            color: var(--text-primary);
+            padding: 0.65rem 1rem;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .dropdown-menu-dark .dropdown-item:hover {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%);
+            color: var(--primary-color);
+        }
+
+        .dropdown-menu-dark .dropdown-item.text-danger:hover {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger-color);
+        }
+
+        .dropdown-menu-dark .dropdown-item-text {
+            padding: 0.65rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        .dropdown-menu-dark .dropdown-divider {
+            border-color: rgba(71, 85, 105, 0.3);
+        }
+
+        /* User menu button */
+        #userMenuBtn {
+            border-color: rgba(71, 85, 105, 0.6);
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        #userMenuBtn:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        /* Session expired overlay */
+        .session-expired-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .session-expired-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            border-radius: 16px;
+            padding: 2.5rem;
+            text-align: center;
+            max-width: 420px;
+            animation: slideInUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .session-expired-card i {
+            font-size: 3.5rem;
+            color: var(--warning-color);
+            margin-bottom: 1.25rem;
+            display: block;
+            animation: bounce 0.6s ease;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .session-expired-card h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .session-expired-card p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            line-height: 1.5;
+        }
+
+        /* Animations for loading and transitions */
+        @media (max-width: 768px) {
+            .workflow-diagram {
+                flex-direction: column;
+            }
+            .workflow-arrow {
+                transform: rotate(90deg);
+            }
+            
+            .stats-row {
+                flex-direction: column;
+            }
+        }
+
+        /* Smooth transitions */
+        @supports (backdrop-filter: blur(10px)) {
+            .card,
+            .modal-content,
+            .dropdown-menu-dark,
+            .navbar {
+                backdrop-filter: blur(10px);
+            }
+        }
+
+        .row {
+            animation: fadeInDelay 0.5s ease-out;
+        }
+
+        @keyframes fadeInDelay {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-gear-wide-connected me-2"></i>
+                ServiceNow Incident Processor
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <div id="connectionStatus" class="connection-status disconnected">
+                    <i class="bi bi-circle-fill"></i>
+                    <span>Checking...</span>
+                </div>
+                <button class="btn btn-outline-light btn-sm" onclick="testConnections()">
+                    <i class="bi bi-arrow-clockwise"></i> Test
+                </button>
+                <!-- User Menu -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-light btn-sm dropdown-toggle d-flex align-items-center gap-2" type="button" id="userMenuBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle"></i>
+                        <span id="userDisplayName">{{ user.display_name if user else 'User' }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" aria-labelledby="userMenuBtn">
+                        <li>
+                            <span class="dropdown-item-text">
+                                <small class="text-secondary">Signed in as</small><br>
+                                <strong id="userUsername">{{ user.username if user else '' }}</strong>
+                            </span>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item text-danger" href="/logout" onclick="return confirmLogout()">
+                                <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <!-- Stats Row -->
+        <div class="stats-row mb-4">
+            <div>
+                <div class="card stat-card primary">
+                    <div class="stat-value" id="statTotal">0</div>
+                    <div class="stat-label">Total Processed</div>
+                </div>
+            </div>
+            <div>
+                <div class="card stat-card success">
+                    <div class="stat-value" id="statSuccess">0</div>
+                    <div class="stat-label">Successful</div>
+                </div>
+            </div>
+            <div>
+                <div class="card stat-card danger">
+                    <div class="stat-value" id="statErrors">0</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+            </div>
+            <div>
+                <div class="card stat-card info">
+                    <div class="stat-value" id="statThisWeek">0</div>
+                    <div class="stat-label">This Week</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflow Diagram -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-diagram-3 me-2"></i>Workflow Pipeline</span>
+                <div class="form-check form-switch" style="display: none;">
+                    <input class="form-check-input" type="checkbox" id="dryRunToggle">
+                    <label class="form-check-label" for="dryRunToggle">Dry Run Mode</label>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="workflow-diagram">
+                    <div class="workflow-step" id="step0">
+                        <i class="bi bi-person-plus text-purple" style="color: #a855f7 !important;"></i>
+                        <small>User</small>
+                        <small class="text-secondary">Creates Incident</small>
+                    </div>
+                    <i class="bi bi-arrow-right workflow-arrow"></i>
+                    <div class="workflow-step" id="step1">
+                        <i class="bi bi-inbox text-primary"></i>
+                        <small>ServiceNow</small>
+                        <small class="text-secondary">Read Incidents</small>
+                    </div>
+                    <i class="bi bi-arrow-right workflow-arrow"></i>
+                    <div class="workflow-step" id="step2">
+                        <i class="bi bi-code-square text-warning"></i>
+                        <small>Parse</small>
+                        <small class="text-secondary">Redshift Commands</small>
+                    </div>
+                    <i class="bi bi-arrow-right workflow-arrow"></i>
+                    <div class="workflow-step" id="step3">
+                        <i class="bi bi-database text-success"></i>
+                        <small>Execute</small>
+                        <small class="text-secondary">Redshift MCP</small>
+                    </div>
+                    <i class="bi bi-arrow-right workflow-arrow"></i>
+                    <div class="workflow-step" id="step4">
+                        <i class="bi bi-check-circle text-success"></i>
+                        <small>Update</small>
+                        <small class="text-secondary">ServiceNow</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="row g-4">
+            <!-- Left Panel - Monitoring & Processing -->
+            <div class="col-lg-8">
+                <!-- Read Incident - Manual Input -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-search me-2"></i>Read Incident
+                    </div>
+                    <div class="card-body">
+                        <label class="form-label">Incident Number</label>
+                        <div class="row g-2">
+                            <div class="col-md-8">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-dark border-secondary text-secondary">
+                                        <i class="bi bi-ticket-detailed"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="manualIncidentNumber" 
+                                           placeholder="Enter incident number (e.g., INC0010030)"
+                                           onkeypress="if(event.key === 'Enter') processManualIncident()">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100 h-100" id="btnProcessManual" onclick="processManualIncident()">
+                                    <i class="bi bi-play-fill me-1"></i>Process Incident
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-text text-secondary mt-2">
+                            Type an incident number and click Process to fetch and execute operations
+                        </div>
+                        <div id="manualIncidentResult" class="mt-3 d-none">
+                            <!-- Results will be shown here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monitoring Control -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <span id="monitoringIndicator" class="status-indicator inactive"></span>
+                            <i class="bi bi-broadcast me-2"></i>Incident Monitoring
+                        </span>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary btn-sm" id="btnStartMonitor" onclick="startMonitoring()">
+                                <i class="bi bi-play-fill me-1"></i>Start
+                            </button>
+                            <button class="btn btn-outline-light btn-sm" id="btnStopMonitor" onclick="stopMonitoring()" disabled>
+                                <i class="bi bi-stop-fill me-1"></i>Stop
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">From Date</label>
+                                <input type="date" class="form-control" id="monitorFromDate">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Poll Interval (seconds)</label>
+                                <input type="number" class="form-control" id="pollInterval" value="10" min="5" max="300">
+                            </div>
+                        </div>
+                        <div id="monitorStatus" class="mt-3 text-secondary small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Monitoring is inactive. Click Start to begin watching for new incidents.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabIncidents">
+                            <i class="bi bi-list-ul me-1"></i>Incidents
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabHistory">
+                            <i class="bi bi-clock-history me-1"></i>Processing History
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Incidents Tab -->
+                    <div class="tab-pane fade show active" id="tabIncidents">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-exclamation-triangle me-2"></i>ServiceNow Incidents</span>
+                                <div class="action-buttons">
+                                    <button class="btn btn-outline-light btn-sm" onclick="refreshIncidents()">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                    </button>
+                                    <button class="btn btn-primary btn-sm" id="btnProcessSelected" onclick="processSelected()" disabled>
+                                        <i class="bi bi-play-fill me-1"></i>Process Selected
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="incidentsLoading" class="spinner-container">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                                <div id="incidentsEmpty" class="empty-state d-none">
+                                    <i class="bi bi-inbox"></i>
+                                    <p>No incidents found</p>
+                                    <button class="btn btn-primary btn-sm" onclick="refreshIncidents()">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                    </button>
+                                </div>
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-hover mb-0" id="incidentsTable">
+                                        <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 1;">
+                                            <tr>
+                                                <th style="width: 40px;">
+                                                    <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()">
+                                                </th>
+                                                <th>Incident</th>
+                                                <th>Type</th>
+                                                <th>Description</th>
+                                                <th>Parsed Details</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="incidentsBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Pagination for Incidents -->
+                                <div class="card-footer d-flex justify-content-between align-items-center" id="incidentsPagination">
+                                    <small class="text-secondary" id="incidentsPageInfo">Showing 0 of 0 incidents</small>
+                                    <nav aria-label="Incidents pagination">
+                                        <ul class="pagination pagination-sm mb-0" id="incidentsPaginationList">
+                                        </ul>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- History Tab -->
+                    <div class="tab-pane fade" id="tabHistory">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-clock-history me-2"></i>Processing History</span>
+                                <button class="btn btn-outline-light btn-sm" onclick="clearHistory()">
+                                    <i class="bi bi-trash me-1"></i>Clear
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="historyEmpty" class="empty-state d-none">
+                                    <i class="bi bi-clock"></i>
+                                    <p>No processing history yet</p>
+                                </div>
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-hover mb-0" id="historyTable">
+                                        <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 1;">
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Incident</th>
+                                                <th>Result</th>
+                                                <th>Message</th>
+                                                <th>Details</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="historyBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Pagination for History -->
+                                <div class="card-footer d-flex justify-content-between align-items-center" id="historyPagination">
+                                    <small class="text-secondary" id="historyPageInfo">Showing 0 of 0 records</small>
+                                    <nav aria-label="History pagination">
+                                        <ul class="pagination pagination-sm mb-0" id="historyPaginationList">
+                                        </ul>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Activity Log -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-terminal me-2"></i>Activity Log</span>
+                        <button class="btn btn-outline-light btn-sm" onclick="clearLog()">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="log-container" id="logContainer">
+                            <div class="log-entry log-info">
+                                <span class="log-timestamp">[--:--:--]</span>
+                                System initialized. Waiting for activity...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Config Info -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <i class="bi bi-gear me-2"></i>Configuration
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <small class="text-secondary">ServiceNow Instance</small>
+                            <div id="configSnowUrl" class="text-truncate text-light">Loading...</div>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-secondary">AWS Region</small>
+                            <div id="configAwsRegion" class="text-light">Loading...</div>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-secondary">Redshift Database</small>
+                            <div id="configRedshiftDb" class="text-light">Loading...</div>
+                        </div>
+                        <div>
+                            <small class="text-secondary">Redshift User</small>
+                            <div id="configRedshiftUser" class="text-light">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incident Detail Modal -->
+    <div class="modal fade" id="incidentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <span id="modalIncidentNumber">Incident Details</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="modalContent">
+                        <div class="spinner-container">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="modalProcessBtn" onclick="processFromModal()">
+                        <i class="bi bi-play-fill me-1"></i>Process Incident
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // State
+        let incidents = [];
+        let selectedIncidents = new Set();
+        let currentIncident = null;
+        let eventSource = null;
+        let monitoringActive = false;
+        
+        // Pagination state
+        const ITEMS_PER_PAGE = 10;
+        let incidentsCurrentPage = 1;
+        let historyCurrentPage = 1;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set default date to today
+            document.getElementById('monitorFromDate').value = new Date().toISOString().split('T')[0];
+            
+            // Load initial data
+            loadConfig();
+            loadStatus();
+            refreshIncidents();
+            testConnections();
+            loadHistory();
+            
+            // Connect to SSE
+            connectEventSource();
+        });
+
+        // API Functions
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                document.getElementById('configSnowUrl').textContent = config.servicenow_url || 'Not configured';
+                document.getElementById('configAwsRegion').textContent = config.aws_region;
+                document.getElementById('configRedshiftDb').textContent = config.redshift_database;
+                document.getElementById('configRedshiftUser').textContent = config.redshift_db_user;
+                document.getElementById('dryRunToggle').checked = config.dry_run;
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
+
+        async function loadStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                
+                document.getElementById('statTotal').textContent = status.processed_count;
+                document.getElementById('statSuccess').textContent = status.success_count;
+                document.getElementById('statErrors').textContent = status.error_count;
+                document.getElementById('statThisWeek').textContent = status.this_week_count || 0;
+                
+                updateMonitoringUI(status.monitoring_active);
+            } catch (error) {
+                console.error('Failed to load status:', error);
+            }
+        }
+
+        async function testConnections() {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = 'connection-status disconnected';
+            statusEl.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i><span>Testing...</span>';
+            
+            try {
+                const response = await fetch('/api/test-connection');
+                const results = await response.json();
+                
+                const allConnected = results.servicenow.success && results.aws.success;
+                
+                if (allConnected) {
+                    statusEl.className = 'connection-status connected';
+                    statusEl.innerHTML = '<i class="bi bi-circle-fill"></i><span>Connected</span>';
+                    addLog('Connections verified: ServiceNow ✓, AWS ✓', 'success');
+                } else {
+                    statusEl.className = 'connection-status disconnected';
+                    let msg = [];
+                    if (!results.servicenow.success) msg.push('ServiceNow');
+                    if (!results.aws.success) msg.push('AWS');
+                    statusEl.innerHTML = `<i class="bi bi-circle-fill"></i><span>${msg.join(', ')} Failed</span>`;
+                    addLog(`Connection issues: ${msg.join(', ')}`, 'error');
+                }
+            } catch (error) {
+                statusEl.className = 'connection-status disconnected';
+                statusEl.innerHTML = '<i class="bi bi-circle-fill"></i><span>Error</span>';
+                addLog('Failed to test connections', 'error');
+            }
+        }
+
+        async function refreshIncidents() {
+            const loading = document.getElementById('incidentsLoading');
+            const empty = document.getElementById('incidentsEmpty');
+            const body = document.getElementById('incidentsBody');
+            const fromDate = document.getElementById('monitorFromDate').value;
+            
+            loading.classList.remove('d-none');
+            empty.classList.add('d-none');
+            body.innerHTML = '';
+            
+            try {
+                const response = await fetch(`/api/incidents?from_date=${fromDate}&limit=100`);
+                const data = await response.json();
+                
+                loading.classList.add('d-none');
+                
+                if (!data.success || data.incidents.length === 0) {
+                    empty.classList.remove('d-none');
+                    incidents = [];
+                    return;
+                }
+                
+                incidents = data.incidents;
+                incidentsCurrentPage = 1; // Reset to first page when loading new data
+                renderIncidents();
+                addLog(`Loaded ${incidents.length} incidents from ServiceNow`, 'info');
+            } catch (error) {
+                loading.classList.add('d-none');
+                empty.classList.remove('d-none');
+                addLog('Failed to load incidents: ' + error.message, 'error');
+            }
+        }
+
+        function renderIncidents() {
+            const body = document.getElementById('incidentsBody');
+            body.innerHTML = '';
+            
+            // Calculate pagination
+            const totalItems = incidents.length;
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            const startIndex = (incidentsCurrentPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+            const pageIncidents = incidents.slice(startIndex, endIndex);
+            
+            pageIncidents.forEach(inc => {
+                const row = document.createElement('tr');
+                row.className = 'incident-row';
+                
+                const statusBadge = inc.is_processed 
+                    ? '<span class="badge badge-success">Processed</span>'
+                    : inc.is_processable 
+                        ? '<span class="badge badge-primary">Ready</span>'
+                        : '<span class="badge badge-warning">Cannot Parse</span>';
+                
+                row.innerHTML = `
+                    <td>
+                        <input type="checkbox" class="form-check-input incident-checkbox" 
+                               data-incident="${inc.incident_number}" 
+                               ${inc.is_processed ? 'disabled' : ''}
+                               onchange="toggleIncidentSelection('${inc.incident_number}')">
+                    </td>
+                    <td>
+                        <strong>${inc.incident_number}</strong>
+                        <div class="small text-secondary">${inc.created_on || ''}</div>
+                    </td>
+                    <td>
+                        <span class="badge ${inc.incident_type_badge || 'bg-secondary'} me-2">${inc.incident_type_display || 'Unknown'}</span>
+                    </td>
+                    <td>
+                        <div class="text-truncate" style="max-width: 200px;" title="${inc.short_description || ''}">
+                            ${inc.short_description || 'No description'}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="d-flex flex-nowrap align-items-center gap-1">${inc.incident_type === 'SECURITY_GROUP' 
+                            ? `${inc.sg_operation ? `<span class="badge badge-secondary">${inc.sg_operation}</span>` : ''}${inc.sg_id ? `<span class="badge badge-secondary">${inc.sg_id}</span>` : ''}`
+                            : `${inc.username ? `<span class="badge badge-secondary">User: ${inc.username}</span>` : ''}${inc.cluster ? `<span class="badge badge-secondary">${inc.cluster}</span>` : ''}`}${!inc.username && !inc.cluster && !inc.sg_id ? '<span class="text-secondary small">No parseable data</span>' : ''}</div>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-outline-light btn-sm" onclick="showIncidentDetail('${inc.incident_number}')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="processSingleIncident('${inc.incident_number}')"
+                                    ${inc.is_processed || !inc.is_processable ? 'disabled' : ''}>
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                body.appendChild(row);
+            });
+            
+            // Update pagination info and controls
+            updatePagination('incidents', totalItems, totalPages, incidentsCurrentPage);
+        }
+        
+        function updatePagination(type, totalItems, totalPages, currentPage) {
+            const pageInfo = document.getElementById(`${type}PageInfo`);
+            const paginationList = document.getElementById(`${type}PaginationList`);
+            
+            // Update info text
+            const startItem = totalItems === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
+            const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+            pageInfo.textContent = `Showing ${startItem}-${endItem} of ${totalItems} ${type === 'incidents' ? 'incidents' : 'records'}`;
+            
+            // Build pagination controls
+            paginationList.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            // Previous button
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage('${type}', ${currentPage - 1}); return false;">←</a>`;
+            paginationList.appendChild(prevLi);
+            
+            // Page numbers
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                li.innerHTML = `<a class="page-link" href="#" onclick="changePage('${type}', ${i}); return false;">${i}</a>`;
+                paginationList.appendChild(li);
+            }
+            
+            // Next button
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage('${type}', ${currentPage + 1}); return false;">→</a>`;
+            paginationList.appendChild(nextLi);
+        }
+        
+        function changePage(type, page) {
+            if (type === 'incidents') {
+                const totalPages = Math.ceil(incidents.length / ITEMS_PER_PAGE);
+                if (page < 1 || page > totalPages) return;
+                incidentsCurrentPage = page;
+                renderIncidents();
+            } else if (type === 'history') {
+                const totalPages = Math.ceil(historyData.length / ITEMS_PER_PAGE);
+                if (page < 1 || page > totalPages) return;
+                historyCurrentPage = page;
+                renderHistory();
+            }
+        }
+
+        function toggleIncidentSelection(incidentNumber) {
+            if (selectedIncidents.has(incidentNumber)) {
+                selectedIncidents.delete(incidentNumber);
+            } else {
+                selectedIncidents.add(incidentNumber);
+            }
+            updateProcessButton();
+        }
+
+        function toggleSelectAll() {
+            const checked = document.getElementById('selectAll').checked;
+            document.querySelectorAll('.incident-checkbox:not(:disabled)').forEach(cb => {
+                cb.checked = checked;
+                const incNum = cb.dataset.incident;
+                if (checked) {
+                    selectedIncidents.add(incNum);
+                } else {
+                    selectedIncidents.delete(incNum);
+                }
+            });
+            updateProcessButton();
+        }
+
+        function updateProcessButton() {
+            const btn = document.getElementById('btnProcessSelected');
+            btn.disabled = selectedIncidents.size === 0;
+            btn.innerHTML = `<i class="bi bi-play-fill me-1"></i>Process Selected (${selectedIncidents.size})`;
+        }
+
+        async function processSingleIncident(incidentNumber) {
+            const dryRun = document.getElementById('dryRunToggle').checked;
+            
+            addLog(`Processing incident ${incidentNumber}...`, 'info');
+            showToast('Processing', `Processing incident ${incidentNumber}...`, 'info');
+            
+            try {
+                const response = await fetch(`/api/process/${incidentNumber}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dry_run: dryRun })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`✓ Incident ${incidentNumber} processed successfully`, 'success');
+                    showToast('Success', `Incident ${incidentNumber} processed`, 'success');
+                } else {
+                    // Check for group validation error - show special popup
+                    if (result.error_code === 'INVALID_GROUP') {
+                        showGroupValidationError(incidentNumber, result.current_group, result.required_group, result.error);
+                        addLog(`✗ Group validation failed for ${incidentNumber}: ${result.error}`, 'warning');
+                    } else if (result.error_code === 'UNKNOWN_INCIDENT_TYPE') {
+                        showUnknownTypeError(incidentNumber, result.error);
+                        addLog(`✗ Unknown incident type for ${incidentNumber}: ${result.error}`, 'warning');
+                    } else {
+                        addLog(`✗ Failed to process ${incidentNumber}: ${result.message || result.error}`, 'error');
+                        showToast('Error', result.message || result.error, 'error');
+                    }
+                }
+                
+                loadStatus();
+                refreshIncidents();
+                loadHistory();
+                return result;
+            } catch (error) {
+                addLog(`✗ Error processing ${incidentNumber}: ${error.message}`, 'error');
+                showToast('Error', error.message, 'error');
+                return { success: false, error: error.message };
+            }
+        }
+        
+        // Show group validation error modal/popup
+        function showGroupValidationError(incidentNumber, currentGroup, requiredGroup, errorMessage) {
+            const groupDisplay = currentGroup || 'None (unassigned)';
+            const modalHtml = `
+                <div class="modal fade" id="groupValidationModal" tabindex="-1" aria-labelledby="groupValidationModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content bg-dark border-warning">
+                            <div class="modal-header border-warning">
+                                <h5 class="modal-title text-warning" id="groupValidationModalLabel">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Group Validation Error
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning mb-3">
+                                    <strong>Cannot process incident ${incidentNumber}</strong>
+                                </div>
+                                <p class="mb-2">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    This incident is assigned to group: <strong class="text-info">${groupDisplay}</strong>
+                                </p>
+                                <p class="mb-3">
+                                    <i class="bi bi-check-circle me-2 text-success"></i>
+                                    Only incidents assigned to <strong class="text-success">${requiredGroup} - Redshift Work Group</strong> can be processed.
+                                </p>
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-lightbulb me-2"></i>
+                                    <strong>Action Required:</strong> Please select an incident from the <strong>${requiredGroup}</strong> group, or reassign this incident to <strong>${requiredGroup}</strong> in ServiceNow portal.
+                                </div>
+                            </div>
+                            <div class="modal-footer border-warning">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('manualIncidentNumber').focus(); bootstrap.Modal.getInstance(document.getElementById('groupValidationModal')).hide();">
+                                    <i class="bi bi-search me-1"></i>Select Another Incident
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('groupValidationModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body and show it
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('groupValidationModal'));
+            modal.show();
+            
+            // Clean up modal after hidden
+            document.getElementById('groupValidationModal').addEventListener('hidden.bs.modal', function() {
+                this.remove();
+            });
+        }
+
+        // Show unknown incident type error modal/popup
+        function showUnknownTypeError(incidentNumber, errorMessage) {
+            const modalHtml = `
+                <div class="modal fade" id="unknownTypeModal" tabindex="-1" aria-labelledby="unknownTypeModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content bg-dark border-secondary">
+                            <div class="modal-header border-secondary">
+                                <h5 class="modal-title text-secondary" id="unknownTypeModalLabel">
+                                    <i class="bi bi-question-circle-fill me-2"></i>Unknown Incident Type
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-secondary mb-3">
+                                    <strong>Cannot process incident ${incidentNumber}</strong>
+                                </div>
+                                <p class="mb-3">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    ${errorMessage}
+                                </p>
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-lightbulb me-2"></i>
+                                    <strong>Supported Incident Types:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><span class="badge bg-primary">Redshift User</span> - Create/manage Redshift database users</li>
+                                        <li><span class="badge bg-warning text-dark">Security Group</span> - Add/remove AWS Security Group rules</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-secondary">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('manualIncidentNumber').focus(); bootstrap.Modal.getInstance(document.getElementById('unknownTypeModal')).hide();">
+                                    <i class="bi bi-search me-1"></i>Try Another Incident
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('unknownTypeModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body and show it
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('unknownTypeModal'));
+            modal.show();
+            
+            // Clean up modal after hidden
+            document.getElementById('unknownTypeModal').addEventListener('hidden.bs.modal', function() {
+                this.remove();
+            });
+        }
+
+        async function processManualIncident() {
+            const input = document.getElementById('manualIncidentNumber');
+            const resultDiv = document.getElementById('manualIncidentResult');
+            const btn = document.getElementById('btnProcessManual');
+            let incidentNumber = input.value.trim().toUpperCase();
+            
+            // Validate input
+            if (!incidentNumber) {
+                showToast('Warning', 'Please enter an incident number', 'warning');
+                input.focus();
+                return;
+            }
+            
+            // Auto-format: if user enters just numbers, prepend INC
+            if (/^\d+$/.test(incidentNumber)) {
+                incidentNumber = 'INC' + incidentNumber.padStart(7, '0');
+                input.value = incidentNumber;
+            }
+            
+            // Validate format
+            if (!/^INC\d{7}$/.test(incidentNumber)) {
+                showToast('Warning', 'Invalid format. Use INC followed by 7 digits (e.g., INC0010030)', 'warning');
+                input.focus();
+                return;
+            }
+            
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
+            resultDiv.classList.remove('d-none');
+            resultDiv.innerHTML = `
+                <div class="alert alert-info mb-0">
+                    <div class="d-flex align-items-center">
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Fetching and processing incident ${incidentNumber}...</span>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                // First, fetch the incident details
+                const detailResponse = await fetch(`/api/incidents/${incidentNumber}`);
+                const detailData = await detailResponse.json();
+                
+                if (!detailData.success) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-x-circle me-2"></i>
+                            <strong>Incident Not Found:</strong> ${detailData.error || 'Could not retrieve incident details'}
+                        </div>
+                    `;
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Process Incident';
+                    return;
+                }
+                
+                const incident = detailData.incident;
+                
+                // Show incident details while processing
+                resultDiv.innerHTML = `
+                    <div class="alert alert-info mb-0">
+                        <div class="mb-2">
+                            <strong><i class="bi bi-ticket-detailed me-1"></i>${incidentNumber}</strong>
+                            <span class="text-muted ms-2">${incident.short_description || 'No description'}</span>
+                        </div>
+                        <div class="small mb-2">
+                            ${incident.username ? `<span class="badge bg-secondary me-1">User: ${incident.username}</span>` : ''}
+                            ${incident.cluster ? `<span class="badge bg-secondary">${incident.cluster}</span>` : ''}
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Executing Redshift operations...</span>
+                        </div>
+                    </div>
+                `;
+                
+                // Process the incident
+                const result = await processSingleIncident(incidentNumber);
+                
+                // Show final result
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success mb-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    <strong>Success!</strong>
+                                    <p class="mb-0 mt-1">${result.message || 'Incident processed successfully'}</p>
+                                </div>
+                                <button class="btn btn-sm btn-outline-success" onclick="showIncidentDetail('${incidentNumber}')">
+                                    <i class="bi bi-eye me-1"></i>Details
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else if (result.error_code === 'INVALID_GROUP') {
+                    // Group validation error - show warning with helpful message
+                    const groupDisplay = result.current_group || 'None (unassigned)';
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-warning mb-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Group Validation Failed</strong>
+                                    <p class="mb-1 mt-1">This incident belongs to group: <strong>${groupDisplay}</strong></p>
+                                    <p class="mb-0 small">Please select an incident from <strong>${result.required_group} - Redshift Work Group</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    // Reset button so user can try another incident
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Process Incident';
+                    // Clear input so user can enter a new incident number
+                    input.value = '';
+                    input.focus();
+                    return;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-danger mb-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <i class="bi bi-x-circle me-2"></i>
+                                    <strong>Failed</strong>
+                                    <p class="mb-0 mt-1">${result.message || result.error || 'Processing failed'}</p>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="showIncidentDetail('${incidentNumber}')">
+                                    <i class="bi bi-eye me-1"></i>Details
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Clear input for next use
+                input.value = '';
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger mb-0">
+                        <i class="bi bi-x-circle me-2"></i>
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+            
+            // Reset button
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Process Incident';
+        }
+
+        async function processSelected() {
+            const incidentNumbers = Array.from(selectedIncidents);
+            const dryRun = document.getElementById('dryRunToggle').checked;
+            
+            addLog(`Processing ${incidentNumbers.length} incidents...`, 'info');
+            showToast('Processing', `Processing ${incidentNumbers.length} incidents...`, 'info');
+            
+            try {
+                const response = await fetch('/api/process-batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ incident_numbers: incidentNumbers, dry_run: dryRun })
+                });
+                
+                const result = await response.json();
+                
+                const successCount = result.results.filter(r => r.success).length;
+                addLog(`Batch complete: ${successCount}/${incidentNumbers.length} successful`, 
+                       successCount === incidentNumbers.length ? 'success' : 'warning');
+                showToast('Complete', `Processed ${successCount}/${incidentNumbers.length} incidents`, 'success');
+                
+                selectedIncidents.clear();
+                updateProcessButton();
+                document.getElementById('selectAll').checked = false;
+                
+                loadStatus();
+                refreshIncidents();
+                loadHistory();
+            } catch (error) {
+                addLog(`Batch processing failed: ${error.message}`, 'error');
+                showToast('Error', error.message, 'error');
+            }
+        }
+
+        async function showIncidentDetail(incidentNumber) {
+            currentIncident = incidentNumber;
+            const modal = new bootstrap.Modal(document.getElementById('incidentModal'));
+            document.getElementById('modalIncidentNumber').textContent = `Incident: ${incidentNumber}`;
+            document.getElementById('modalContent').innerHTML = `
+                <div class="spinner-container">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            `;
+            modal.show();
+            
+            try {
+                const response = await fetch(`/api/incidents/${incidentNumber}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    document.getElementById('modalContent').innerHTML = `
+                        <div class="alert alert-danger">${data.error}</div>
+                    `;
+                    return;
+                }
+                
+                const inc = data.incident;
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Short Description</h6>
+                            <p>${inc.short_description || 'N/A'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Created On</h6>
+                            <p>${inc.created_on || 'N/A'}</p>
+                        </div>
+                        <div class="col-12">
+                            <h6 class="text-secondary">Full Description</h6>
+                            <p class="bg-dark p-3 rounded">${inc.description || 'N/A'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Parsed Username</h6>
+                            <p>${inc.username ? `<span class="badge badge-primary">${inc.username}</span>` : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Parsed Cluster</h6>
+                            <p>${inc.cluster ? `<span class="badge badge-primary">${inc.cluster}</span>` : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                        <div class="col-12">
+                            <h6 class="text-secondary">Status</h6>
+                            ${inc.is_processed 
+                                ? '<span class="badge badge-success">Already Processed</span>'
+                                : inc.is_processable 
+                                    ? '<span class="badge badge-primary">Ready to Process</span>'
+                                    : '<span class="badge badge-warning">Cannot be processed - missing username or cluster</span>'
+                            }
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('modalProcessBtn').disabled = inc.is_processed || !inc.is_processable;
+            } catch (error) {
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="alert alert-danger">Failed to load incident: ${error.message}</div>
+                `;
+            }
+        }
+
+        async function processFromModal() {
+            if (!currentIncident) return;
+            bootstrap.Modal.getInstance(document.getElementById('incidentModal')).hide();
+            await processSingleIncident(currentIncident);
+        }
+
+        // Monitoring Functions
+        async function startMonitoring() {
+            const fromDate = document.getElementById('monitorFromDate').value;
+            const pollInterval = parseInt(document.getElementById('pollInterval').value);
+            const dryRun = document.getElementById('dryRunToggle').checked;
+            
+            try {
+                const response = await fetch('/api/monitor/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ from_date: fromDate, poll_interval: pollInterval, dry_run: dryRun })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`Monitoring started (from ${fromDate}, interval: ${pollInterval}s)`, 'success');
+                    showToast('Monitoring', 'Monitoring started', 'success');
+                    updateMonitoringUI(true);
+                } else {
+                    addLog(`Failed to start monitoring: ${result.message}`, 'error');
+                    showToast('Error', result.message, 'error');
+                }
+            } catch (error) {
+                addLog(`Error starting monitoring: ${error.message}`, 'error');
+                showToast('Error', error.message, 'error');
+            }
+        }
+
+        async function stopMonitoring() {
+            try {
+                const response = await fetch('/api/monitor/stop', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog('Monitoring stopped', 'info');
+                    showToast('Monitoring', 'Monitoring stopped', 'info');
+                    updateMonitoringUI(false);
+                } else {
+                    addLog(`Failed to stop monitoring: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                addLog(`Error stopping monitoring: ${error.message}`, 'error');
+            }
+        }
+
+        function updateMonitoringUI(active) {
+            monitoringActive = active;
+            const indicator = document.getElementById('monitoringIndicator');
+            const startBtn = document.getElementById('btnStartMonitor');
+            const stopBtn = document.getElementById('btnStopMonitor');
+            const status = document.getElementById('monitorStatus');
+            
+            if (active) {
+                indicator.className = 'status-indicator active';
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.innerHTML = '<i class="bi bi-broadcast text-success me-1"></i>Monitoring active - watching for new incidents...';
+            } else {
+                indicator.className = 'status-indicator inactive';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                status.innerHTML = '<i class="bi bi-info-circle me-1"></i>Monitoring is inactive. Click Start to begin watching for new incidents.';
+            }
+        }
+
+        // History Functions
+        let historyData = []; // Store all history data for pagination
+        
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/history?limit=500'); // Fetch more records
+                const data = await response.json();
+                
+                const body = document.getElementById('historyBody');
+                const empty = document.getElementById('historyEmpty');
+                
+                if (data.history.length === 0) {
+                    empty.classList.remove('d-none');
+                    body.innerHTML = '';
+                    updatePagination('history', 0, 0, 1);
+                    return;
+                }
+                
+                empty.classList.add('d-none');
+                historyData = data.history;
+                renderHistory();
+            } catch (error) {
+                console.error('Failed to load history:', error);
+            }
+        }
+        
+        function renderHistory() {
+            const body = document.getElementById('historyBody');
+            body.innerHTML = '';
+            
+            // Calculate pagination
+            const totalItems = historyData.length;
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+            const startIndex = (historyCurrentPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+            const pageHistory = historyData.slice(startIndex, endIndex);
+            
+            pageHistory.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        <small>${item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}</small>
+                    </td>
+                    <td><strong>${item.incident_number}</strong></td>
+                    <td>
+                        ${item.success 
+                            ? '<span class="badge badge-success">Success</span>'
+                            : '<span class="badge badge-danger">Failed</span>'
+                        }
+                    </td>
+                    <td>
+                        <div class="text-truncate" style="max-width: 300px;" title="${item.message || ''}">
+                            ${item.message || 'N/A'}
+                        </div>
+                    </td>
+                    <td>
+                        <button class="btn btn-outline-light btn-sm" onclick='showHistoryDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                    </td>
+                `;
+                body.appendChild(row);
+            });
+            
+            // Update pagination
+            updatePagination('history', totalItems, totalPages, historyCurrentPage);
+        }
+
+        function showHistoryDetail(item) {
+            const content = `
+                <div class="row g-3">
+                    <div class="col-12">
+                        <h6>Incident: ${item.incident_number}</h6>
+                    </div>
+                    <div class="col-12">
+                        <h6 class="text-secondary">Result</h6>
+                        ${item.success 
+                            ? '<span class="badge badge-success">Success</span>'
+                            : '<span class="badge badge-danger">Failed</span>'
+                        }
+                    </div>
+                    <div class="col-12">
+                        <h6 class="text-secondary">Message</h6>
+                        <p>${item.message || 'N/A'}</p>
+                    </div>
+                    <div class="col-12">
+                        <h6 class="text-secondary">Actions</h6>
+                        <ul class="list-unstyled">
+                            ${(item.actions || []).map(a => `<li><i class="bi bi-check2 text-success me-1"></i>${a}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ${item.redshift ? `
+                    <div class="col-12">
+                        <h6 class="text-secondary">Redshift Details</h6>
+                        <pre class="bg-dark p-2 rounded small">${JSON.stringify(item.redshift, null, 2)}</pre>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            document.getElementById('modalIncidentNumber').textContent = `Processing Details: ${item.incident_number}`;
+            document.getElementById('modalContent').innerHTML = content;
+            document.getElementById('modalProcessBtn').style.display = 'none';
+            new bootstrap.Modal(document.getElementById('incidentModal')).show();
+        }
+
+        async function clearHistory() {
+            if (!confirm('Are you sure you want to clear all processing history?')) return;
+            
+            try {
+                await fetch('/api/clear-history', { method: 'POST' });
+                loadHistory();
+                loadStatus();
+                addLog('Processing history cleared', 'info');
+            } catch (error) {
+                addLog('Failed to clear history', 'error');
+            }
+        }
+
+        // Event Source (SSE)
+        function connectEventSource() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource('/api/events');
+            
+            eventSource.onmessage = (event) => {
+                try {
+                    if (event.data && event.data.trim()) {
+                        const data = JSON.parse(event.data);
+                        handleEvent(data);
+                    }
+                } catch (e) {
+                    console.log('SSE parse error:', e.message, 'Data:', event.data);
+                }
+            };
+            
+            eventSource.onerror = () => {
+                console.log('SSE connection error, reconnecting...');
+                setTimeout(connectEventSource, 5000);
+            };
+        }
+
+        function handleEvent(event) {
+            switch (event.type) {
+                case 'incident_processed':
+                    addLog(`Incident ${event.data.incident_number}: ${event.data.success ? 'Success' : 'Failed'}`, 
+                           event.data.success ? 'success' : 'error');
+                    loadStatus();
+                    refreshIncidents();
+                    loadHistory();
+                    break;
+                    
+                case 'poll_complete':
+                    if (event.data.new_incidents > 0) {
+                        addLog(`Found ${event.data.new_incidents} new incident(s)`, 'info');
+                    }
+                    loadStatus();
+                    break;
+                    
+                case 'monitoring_started':
+                    updateMonitoringUI(true);
+                    break;
+                    
+                case 'monitoring_stopped':
+                    updateMonitoringUI(false);
+                    break;
+                    
+                case 'error':
+                    addLog(`Error: ${event.data.message}`, 'error');
+                    break;
+            }
+        }
+
+        // Logging
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span>${message}`;
+            
+            container.insertBefore(entry, container.firstChild);
+            
+            // Keep only last 100 entries
+            while (container.children.length > 100) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('logContainer').innerHTML = `
+                <div class="log-entry log-info">
+                    <span class="log-timestamp">[${new Date().toLocaleTimeString()}]</span>
+                    Log cleared
+                </div>
+            `;
+        }
+
+        // Toast Notifications
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toastId = 'toast-' + Date.now();
+            
+            const bgClass = type === 'success' ? 'bg-success' 
+                          : type === 'error' ? 'bg-danger' 
+                          : type === 'warning' ? 'bg-warning text-dark' 
+                          : 'bg-primary';
+            
+            const textClass = type === 'warning' ? 'text-dark' : 'text-white';
+            const closeClass = type === 'warning' ? '' : 'btn-close-white';
+            
+            const toastHtml = `
+                <div id="${toastId}" class="toast ${bgClass}" role="alert">
+                    <div class="toast-header ${bgClass} ${textClass}">
+                        <strong class="me-auto">${title}</strong>
+                        <button type="button" class="btn-close ${closeClass}" data-bs-dismiss="toast"></button>
+                    </div>
+                    <div class="toast-body ${textClass}">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            const toast = new bootstrap.Toast(document.getElementById(toastId));
+            toast.show();
+            
+            // Remove after hidden
+            document.getElementById(toastId).addEventListener('hidden.bs.toast', () => {
+                document.getElementById(toastId).remove();
+            });
+        }
+
+        // Logout confirmation
+        function confirmLogout() {
+            return confirm('Are you sure you want to sign out?');
+        }
+
+        // Handle session expiration
+        function handleSessionExpired() {
+            // Check if overlay already exists
+            if (document.querySelector('.session-expired-overlay')) return;
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'session-expired-overlay';
+            overlay.innerHTML = `
+                <div class="session-expired-card">
+                    <i class="bi bi-shield-lock"></i>
+                    <h4>Session Expired</h4>
+                    <p>Your session has expired. Please sign in again to continue.</p>
+                    <a href="/login" class="btn btn-primary">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                    </a>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // Wrap fetch to handle auth errors
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const response = await originalFetch.apply(this, args);
+            
+            // Check for authentication errors
+            if (response.status === 401) {
+                const data = await response.clone().json().catch(() => ({}));
+                if (data.redirect === '/login') {
+                    handleSessionExpired();
+                }
+            }
+            
+            return response;
+        };
+
+        // Authentication check function with cache busting
+        async function verifyAuthentication() {
+            try {
+                const response = await originalFetch('/api/auth/status?t=' + Date.now(), {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                const data = await response.json();
+                return data.authenticated === true;
+            } catch (error) {
+                console.error('Auth verification failed:', error);
+                return false;
+            }
+        }
+
+        // Handle unauthenticated state
+        async function checkAndRedirectIfUnauthenticated() {
+            const isAuthenticated = await verifyAuthentication();
+            if (!isAuthenticated) {
+                console.log('User not authenticated, redirecting to login');
+                window.location.replace('/login');
+                return false;
+            }
+            return true;
+        }
+
+        // Periodic session check (every 5 minutes)
+        setInterval(checkAndRedirectIfUnauthenticated, 5 * 60 * 1000);
+
+        // Check authentication when page becomes visible (back button fix)
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                await checkAndRedirectIfUnauthenticated();
+            }
+        });
+
+        // Also check on pageshow event (handles back/forward cache)
+        window.addEventListener('pageshow', async (event) => {
+            // Always check, not just when persisted
+            await checkAndRedirectIfUnauthenticated();
+        });
+
+        // Check authentication immediately on page load
+        (async () => {
+            await checkAndRedirectIfUnauthenticated();
+        })();
+    </script>
+</body>
+</html>
