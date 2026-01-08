@@ -1116,7 +1116,7 @@
                                 <input type="number" class="form-control" id="pollInterval" value="10" min="5" max="300">
                             </div>
                         </div>
-                        <div id="monitorStatus" class="mt-3 text-secondary small">
+                        <div id="monitorStatus" class="mt-3 text-light small">
                             <i class="bi bi-info-circle me-1"></i>
                             Monitoring is inactive. Click Start to begin watching for new incidents.
                         </div>
@@ -1173,6 +1173,7 @@
                                                     <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()">
                                                 </th>
                                                 <th>Incident</th>
+                                                <th>Type</th>
                                                 <th>Description</th>
                                                 <th>Parsed Details</th>
                                                 <th>Status</th>
@@ -1185,7 +1186,7 @@
                                 </div>
                                 <!-- Pagination for Incidents -->
                                 <div class="card-footer d-flex justify-content-between align-items-center" id="incidentsPagination">
-                                    <small class="text-secondary" id="incidentsPageInfo">Showing 0 of 0 incidents</small>
+                                    <small class="text-light" id="incidentsPageInfo">Showing 0 of 0 incidents</small>
                                     <nav aria-label="Incidents pagination">
                                         <ul class="pagination pagination-sm mb-0" id="incidentsPaginationList">
                                         </ul>
@@ -1226,7 +1227,7 @@
                                 </div>
                                 <!-- Pagination for History -->
                                 <div class="card-footer d-flex justify-content-between align-items-center" id="historyPagination">
-                                    <small class="text-secondary" id="historyPageInfo">Showing 0 of 0 records</small>
+                                    <small class="text-light" id="historyPageInfo">Showing 0 of 0 records</small>
                                     <nav aria-label="History pagination">
                                         <ul class="pagination pagination-sm mb-0" id="historyPaginationList">
                                         </ul>
@@ -1264,19 +1265,19 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-2">
-                            <small class="text-secondary">ServiceNow Instance</small>
+                            <small class="text-info">ServiceNow Instance</small>
                             <div id="configSnowUrl" class="text-truncate text-light">Loading...</div>
                         </div>
                         <div class="mb-2">
-                            <small class="text-secondary">AWS Region</small>
+                            <small class="text-info">AWS Region</small>
                             <div id="configAwsRegion" class="text-light">Loading...</div>
                         </div>
                         <div class="mb-2">
-                            <small class="text-secondary">Redshift Database</small>
+                            <small class="text-info">Redshift Database</small>
                             <div id="configRedshiftDb" class="text-light">Loading...</div>
                         </div>
                         <div>
-                            <small class="text-secondary">Redshift User</small>
+                            <small class="text-info">Redshift User</small>
                             <div id="configRedshiftUser" class="text-light">Loading...</div>
                         </div>
                     </div>
@@ -1474,19 +1475,22 @@
                         <div class="small text-secondary">${inc.created_on || ''}</div>
                     </td>
                     <td>
+                        <span class="badge ${inc.incident_type_badge || 'bg-secondary'} me-2">${inc.incident_type_display || 'Unknown'}</span>
+                    </td>
+                    <td>
                         <div class="text-truncate" style="max-width: 200px;" title="${inc.short_description || ''}">
                             ${inc.short_description || 'No description'}
                         </div>
                     </td>
                     <td>
-                        ${inc.username ? `<span class="badge badge-secondary">User: ${inc.username}</span>` : ''}
-                        ${inc.cluster ? `<span class="badge badge-secondary ms-1">${inc.cluster}</span>` : ''}
-                        ${!inc.username && !inc.cluster ? '<span class="text-secondary small">No parseable data</span>' : ''}
+                        <div class="d-flex flex-nowrap align-items-center gap-1">${inc.incident_type === 'SECURITY_GROUP' 
+                            ? `${inc.sg_operation ? `<span class="badge badge-secondary">${inc.sg_operation}</span>` : ''}${inc.sg_id ? `<span class="badge badge-secondary">${inc.sg_id}</span>` : ''}`
+                            : `${inc.username ? `<span class="badge badge-secondary">User: ${inc.username}</span>` : ''}${inc.cluster ? `<span class="badge badge-secondary">${inc.cluster}</span>` : ''}`}${!inc.username && !inc.cluster && !inc.sg_id ? '<span class="text-secondary small">No parseable data</span>' : ''}</div>
                     </td>
                     <td>${statusBadge}</td>
                     <td>
                         <div class="action-buttons">
-                            <button class="btn btn-outline-light btn-sm" onclick="showIncidentDetail('${inc.incident_number}')">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="showIncidentDetail('${inc.incident_number}')">
                                 <i class="bi bi-eye"></i>
                             </button>
                             <button class="btn btn-primary btn-sm" onclick="processSingleIncident('${inc.incident_number}')"
@@ -1612,6 +1616,9 @@
                     if (result.error_code === 'INVALID_GROUP') {
                         showGroupValidationError(incidentNumber, result.current_group, result.required_group, result.error);
                         addLog(`✗ Group validation failed for ${incidentNumber}: ${result.error}`, 'warning');
+                    } else if (result.error_code === 'UNKNOWN_INCIDENT_TYPE') {
+                        showUnknownTypeError(incidentNumber, result.error);
+                        addLog(`✗ Unknown incident type for ${incidentNumber}: ${result.error}`, 'warning');
                     } else {
                         addLog(`✗ Failed to process ${incidentNumber}: ${result.message || result.error}`, 'error');
                         showToast('Error', result.message || result.error, 'error');
@@ -1683,6 +1690,63 @@
             
             // Clean up modal after hidden
             document.getElementById('groupValidationModal').addEventListener('hidden.bs.modal', function() {
+                this.remove();
+            });
+        }
+
+        // Show unknown incident type error modal/popup
+        function showUnknownTypeError(incidentNumber, errorMessage) {
+            const modalHtml = `
+                <div class="modal fade" id="unknownTypeModal" tabindex="-1" aria-labelledby="unknownTypeModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content bg-dark border-secondary">
+                            <div class="modal-header border-secondary">
+                                <h5 class="modal-title text-secondary" id="unknownTypeModalLabel">
+                                    <i class="bi bi-question-circle-fill me-2"></i>Unknown Incident Type
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-secondary mb-3">
+                                    <strong>Cannot process incident ${incidentNumber}</strong>
+                                </div>
+                                <p class="mb-3">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    ${errorMessage}
+                                </p>
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-lightbulb me-2"></i>
+                                    <strong>Supported Incident Types:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><span class="badge bg-primary">Redshift User</span> - Create/manage Redshift database users</li>
+                                        <li><span class="badge bg-warning text-dark">Security Group</span> - Add/remove AWS Security Group rules</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-secondary">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('manualIncidentNumber').focus(); bootstrap.Modal.getInstance(document.getElementById('unknownTypeModal')).hide();">
+                                    <i class="bi bi-search me-1"></i>Try Another Incident
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('unknownTypeModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body and show it
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('unknownTypeModal'));
+            modal.show();
+            
+            // Clean up modal after hidden
+            document.getElementById('unknownTypeModal').addEventListener('hidden.bs.modal', function() {
                 this.remove();
             });
         }
@@ -1895,6 +1959,84 @@
                 }
                 
                 const inc = data.incident;
+                
+                // Build content based on incident type
+                let parsedDetailsHtml = '';
+                let statusHtml = '';
+                
+                if (inc.incident_type === 'SECURITY_GROUP') {
+                    // Security Group incident - show SG-specific fields
+                    parsedDetailsHtml = `
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Incident Type</h6>
+                            <p><span class="badge bg-warning text-dark">Security Group</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Operation</h6>
+                            <p>${inc.sg_operation ? `<span class="badge badge-primary">${inc.sg_operation}</span>` : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Security Group ID</h6>
+                            <p>${inc.sg_id ? `<span class="badge badge-primary">${inc.sg_id}</span>` : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">CIDR Range(s)</h6>
+                            <p>${inc.sg_cidrs && inc.sg_cidrs.length > 0 
+                                ? inc.sg_cidrs.map(c => `<span class="badge badge-secondary me-1">${c}</span>`).join('') 
+                                : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                    `;
+                    // Status for Security Group
+                    statusHtml = inc.is_processed 
+                        ? '<span class="badge badge-success">Already Processed</span>'
+                        : inc.is_processable 
+                            ? '<span class="badge badge-primary">Ready to Process</span>'
+                            : '<span class="badge badge-warning">Cannot be processed - missing SG ID, operation, CIDR, or port</span>';
+                } else if (inc.incident_type === 'REDSHIFT_USER') {
+                    // Redshift User incident - show Redshift-specific fields
+                    parsedDetailsHtml = `
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Incident Type</h6>
+                            <p><span class="badge bg-primary">Redshift User</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Parsed Username</h6>
+                            <p>${inc.username ? `<span class="badge badge-primary">${inc.username}</span>` : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Parsed Cluster</h6>
+                            <p>${inc.cluster ? `<span class="badge badge-primary">${inc.cluster}</span>` : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Group Name</h6>
+                            <p>${inc.group_name ? `<span class="badge badge-secondary">${inc.group_name}</span>` : '<span class="text-muted">Default</span>'}</p>
+                        </div>
+                    `;
+                    // Status for Redshift User
+                    statusHtml = inc.is_processed 
+                        ? '<span class="badge badge-success">Already Processed</span>'
+                        : inc.is_processable 
+                            ? '<span class="badge badge-primary">Ready to Process</span>'
+                            : '<span class="badge badge-warning">Cannot be processed - missing username or cluster</span>';
+                } else {
+                    // Unknown incident type
+                    parsedDetailsHtml = `
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Incident Type</h6>
+                            <p><span class="badge bg-secondary">Unknown</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Parsed Username</h6>
+                            <p>${inc.username ? `<span class="badge badge-primary">${inc.username}</span>` : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Parsed Cluster</h6>
+                            <p>${inc.cluster ? `<span class="badge badge-primary">${inc.cluster}</span>` : '<span class="text-warning">Not found</span>'}</p>
+                        </div>
+                    `;
+                    statusHtml = '<span class="badge badge-secondary">Unknown incident type - cannot be processed</span>';
+                }
+                
                 document.getElementById('modalContent').innerHTML = `
                     <div class="row g-4">
                         <div class="col-md-6">
@@ -1909,22 +2051,10 @@
                             <h6 class="text-secondary">Full Description</h6>
                             <p class="bg-dark p-3 rounded">${inc.description || 'N/A'}</p>
                         </div>
-                        <div class="col-md-6">
-                            <h6 class="text-secondary">Parsed Username</h6>
-                            <p>${inc.username ? `<span class="badge badge-primary">${inc.username}</span>` : '<span class="text-warning">Not found</span>'}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <h6 class="text-secondary">Parsed Cluster</h6>
-                            <p>${inc.cluster ? `<span class="badge badge-primary">${inc.cluster}</span>` : '<span class="text-warning">Not found</span>'}</p>
-                        </div>
+                        ${parsedDetailsHtml}
                         <div class="col-12">
                             <h6 class="text-secondary">Status</h6>
-                            ${inc.is_processed 
-                                ? '<span class="badge badge-success">Already Processed</span>'
-                                : inc.is_processable 
-                                    ? '<span class="badge badge-primary">Ready to Process</span>'
-                                    : '<span class="badge badge-warning">Cannot be processed - missing username or cluster</span>'
-                            }
+                            ${statusHtml}
                         </div>
                     </div>
                 `;
@@ -2065,7 +2195,7 @@
                         </div>
                     </td>
                     <td>
-                        <button class="btn btn-outline-light btn-sm" onclick='showHistoryDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
+                        <button class="btn btn-outline-secondary btn-sm" onclick='showHistoryDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
                             <i class="bi bi-info-circle"></i>
                         </button>
                     </td>
@@ -2078,10 +2208,36 @@
         }
 
         function showHistoryDetail(item) {
+            // Determine incident type badge
+            let typeBadge = '';
+            if (item.incident_type === 'SECURITY_GROUP') {
+                typeBadge = '<span class="badge bg-warning text-dark me-2">Security Group</span>';
+            } else if (item.incident_type === 'REDSHIFT_USER') {
+                typeBadge = '<span class="badge bg-primary me-2">Redshift User</span>';
+            }
+            
+            // Filter actions to hide internal details from customer view
+            // Hidden: Terraform backup info, before/after state captures
+            const filteredActions = (item.actions || []).filter(action => {
+                const lowerAction = action.toLowerCase();
+                return !lowerAction.includes('terraform backup') && 
+                       !lowerAction.includes('before state captured') &&
+                       !lowerAction.includes('after state captured');
+            });
+            
+            // Filter sg_details to hide internal/sensitive information from customer
+            // Hidden: backup file paths, rules before/after counts
+            let filteredSgDetails = null;
+            if (item.sg_details) {
+                filteredSgDetails = { ...item.sg_details };
+                delete filteredSgDetails.backup;  // Hide backup file paths
+                delete filteredSgDetails.rules;   // Hide before/after rule counts
+            }
+            
             const content = `
                 <div class="row g-3">
                     <div class="col-12">
-                        <h6>Incident: ${item.incident_number}</h6>
+                        <h6>Incident: ${item.incident_number} ${typeBadge}</h6>
                     </div>
                     <div class="col-12">
                         <h6 class="text-secondary">Result</h6>
@@ -2097,13 +2253,19 @@
                     <div class="col-12">
                         <h6 class="text-secondary">Actions</h6>
                         <ul class="list-unstyled">
-                            ${(item.actions || []).map(a => `<li><i class="bi bi-check2 text-success me-1"></i>${a}</li>`).join('')}
+                            ${filteredActions.map(a => `<li><i class="bi bi-check2 text-success me-1"></i>${a}</li>`).join('')}
                         </ul>
                     </div>
                     ${item.redshift ? `
                     <div class="col-12">
                         <h6 class="text-secondary">Redshift Details</h6>
-                        <pre class="bg-dark p-2 rounded small">${JSON.stringify(item.redshift, null, 2)}</pre>
+                        <pre class="bg-dark p-2 rounded small" style="max-height: 400px; overflow-y: auto;">${JSON.stringify(item.redshift, null, 2)}</pre>
+                    </div>
+                    ` : ''}
+                    ${filteredSgDetails ? `
+                    <div class="col-12">
+                        <h6 class="text-secondary">Security Group Details</h6>
+                        <pre class="bg-dark p-2 rounded small" style="max-height: 400px; overflow-y: auto;">${JSON.stringify(filteredSgDetails, null, 2)}</pre>
                     </div>
                     ` : ''}
                 </div>

@@ -187,7 +187,10 @@ class ServiceNowClient:
             "TASK 2 COMPLETED",
             "Incident already processed",
             "User successfully created",
-            "Redshift user already exists"
+            "Redshift user already exists",
+            # Security Group processor markers
+            "MCP Server Automation",
+            "Actions Performed by MCP Server Automation"
         ]
         return any(indicator in work_notes for indicator in indicators)
 

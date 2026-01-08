@@ -29,12 +29,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
+from enum import Enum
+
 # Import database-backed authentication modules
 from web_ui import database as db
 from web_ui import auth
 from web_ui.agui_auth import AuthActionHandler, create_agui_auth_routes
 
-# Import the core processor
+# Import the core Redshift processor
 from process_servicenow_redshift import (
     ServiceNowClient, 
     RedshiftClient, 
@@ -42,6 +44,113 @@ from process_servicenow_redshift import (
     IncidentProcessor,
     Config
 )
+
+# Import security group processor functions
+from process_security_group_incident import (
+    parse_security_group_request,
+    process_incident as process_security_group_incident
+)
+
+
+# ============================================================================
+# Incident Type Detection
+# ============================================================================
+
+class IncidentType(Enum):
+    """Enum for different incident types that can be processed."""
+    REDSHIFT_USER = "REDSHIFT_USER"  # Redshift user creation/management
+    SECURITY_GROUP = "SECURITY_GROUP"  # AWS Security Group modifications
+    UNKNOWN = "UNKNOWN"  # Unknown/unrecognized incident type
+
+
+def detect_incident_type(description: str, short_description: str = "") -> IncidentType:
+    """
+    Detect the type of incident based on keywords in description.
+    
+    This function analyzes the incident description to determine which
+    processor should handle the incident.
+    
+    Args:
+        description: The full incident description
+        short_description: The short description (title) of the incident
+        
+    Returns:
+        IncidentType enum value indicating the incident type
+    """
+    import re
+    
+    full_text = f"{description} {short_description}".lower()
+    
+    # Security Group indicators (check first - more specific)
+    security_group_patterns = [
+        r'security\s+group',
+        r'sg-[a-zA-Z0-9]+',  # Security group ID pattern
+        r'inbound\s+rule',
+        r'outbound\s+rule',
+        r'add\s+(an?\s+)?inbound',
+        r'add\s+(an?\s+)?outbound',
+        r'remove\s+(an?\s+)?inbound',
+        r'remove\s+(an?\s+)?outbound',
+        r'cidr\s+range',
+        r'firewall\s+rule'
+    ]
+    
+    for pattern in security_group_patterns:
+        if re.search(pattern, full_text):
+            return IncidentType.SECURITY_GROUP
+    
+    # Redshift user indicators
+    redshift_patterns = [
+        r'redshift.*user',
+        r'create.*user.*redshift',
+        r'user.*redshift.*cluster',
+        r'database\s+user',
+        r'add.*user.*group',
+        r'grant.*privilege',
+        r'redshift-cluster-\d+',
+        r'username[:\s]',
+        r'schema\s+access'
+    ]
+    
+    for pattern in redshift_patterns:
+        if re.search(pattern, full_text):
+            return IncidentType.REDSHIFT_USER
+    
+    # Default to unknown if no patterns match
+    return IncidentType.UNKNOWN
+
+
+def get_incident_type_display(incident_type: IncidentType) -> dict:
+    """
+    Get display information for an incident type.
+    
+    Args:
+        incident_type: The IncidentType enum value
+        
+    Returns:
+        Dictionary with display name, badge color, and description
+    """
+    type_info = {
+        IncidentType.REDSHIFT_USER: {
+            "type_code": "REDSHIFT_USER",
+            "display_name": "Redshift User",
+            "badge_class": "bg-primary",
+            "description": "Redshift database user creation/management"
+        },
+        IncidentType.SECURITY_GROUP: {
+            "type_code": "SECURITY_GROUP",
+            "display_name": "Security Group",
+            "badge_class": "bg-warning text-dark",
+            "description": "AWS Security Group rule modifications"
+        },
+        IncidentType.UNKNOWN: {
+            "type_code": "UNKNOWN",
+            "display_name": "Unknown",
+            "badge_class": "bg-secondary",
+            "description": "Unrecognized incident type"
+        }
+    }
+    return type_info.get(incident_type, type_info[IncidentType.UNKNOWN])
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
@@ -308,11 +417,41 @@ def list_incidents():
         client = ServiceNowClient()
         incidents = client.list_incidents(from_date, limit)
         
-        # Parse each incident
+        # Parse each incident and detect type
         parsed_incidents = []
         for inc in incidents:
             parsed = IncidentParser.parse_incident(inc)
-            parsed["is_processable"] = bool(parsed["username"] and parsed["cluster"])
+            
+            # Detect incident type from description
+            description = inc.get("description", "") or ""
+            short_desc = inc.get("short_description", "") or ""
+            incident_type = detect_incident_type(description, short_desc)
+            type_info = get_incident_type_display(incident_type)
+            
+            # Add type information to parsed incident
+            parsed["incident_type"] = type_info["type_code"]
+            parsed["incident_type_display"] = type_info["display_name"]
+            parsed["incident_type_badge"] = type_info["badge_class"]
+            
+            # Determine processability based on incident type
+            if incident_type == IncidentType.REDSHIFT_USER:
+                parsed["is_processable"] = bool(parsed["username"] and parsed["cluster"])
+            elif incident_type == IncidentType.SECURITY_GROUP:
+                # Parse security group request to check if processable
+                sg_request = parse_security_group_request(description)
+                parsed["is_processable"] = bool(
+                    sg_request.get("operation") and 
+                    sg_request.get("security_group_id") and 
+                    sg_request.get("cidrs") and 
+                    sg_request.get("port")
+                )
+                # Add security group specific fields for display
+                parsed["sg_operation"] = sg_request.get("operation", "").replace("_", " ").title()
+                parsed["sg_id"] = sg_request.get("security_group_id")
+                parsed["sg_cidrs"] = sg_request.get("cidrs", [])
+            else:
+                parsed["is_processable"] = False
+            
             parsed["is_processed"] = client.is_already_processed(inc)
             parsed_incidents.append(parsed)
         
@@ -344,7 +483,39 @@ def get_incident(incident_number: str):
             }), 404
         
         parsed = IncidentParser.parse_incident(incident)
-        parsed["is_processable"] = bool(parsed["username"] and parsed["cluster"])
+        
+        # Detect incident type from description
+        description = incident.get("description", "") or ""
+        short_desc = incident.get("short_description", "") or ""
+        incident_type = detect_incident_type(description, short_desc)
+        type_info = get_incident_type_display(incident_type)
+        
+        # Add type information to parsed incident
+        parsed["incident_type"] = type_info["type_code"]
+        parsed["incident_type_display"] = type_info["display_name"]
+        parsed["incident_type_badge"] = type_info["badge_class"]
+        
+        # Determine processability based on incident type
+        if incident_type == IncidentType.REDSHIFT_USER:
+            parsed["is_processable"] = bool(parsed["username"] and parsed["cluster"])
+        elif incident_type == IncidentType.SECURITY_GROUP:
+            # Parse security group request to check if processable
+            sg_request = parse_security_group_request(description)
+            parsed["is_processable"] = bool(
+                sg_request.get("operation") and 
+                sg_request.get("security_group_id") and 
+                sg_request.get("cidrs") and 
+                sg_request.get("port")
+            )
+            # Add security group specific fields for display
+            parsed["sg_operation"] = sg_request.get("operation", "").replace("_", " ").title()
+            parsed["sg_id"] = sg_request.get("security_group_id")
+            parsed["sg_cidrs"] = sg_request.get("cidrs", [])
+            parsed["sg_port"] = sg_request.get("port")
+            parsed["sg_region"] = sg_request.get("region", "us-east-1")
+        else:
+            parsed["is_processable"] = False
+        
         parsed["is_processed"] = client.is_already_processed(incident)
         parsed["raw_data"] = incident
         
@@ -361,8 +532,12 @@ def get_incident(incident_number: str):
 
 @app.route('/api/process/<incident_number>', methods=['POST'])
 @login_required
-def process_incident(incident_number: str):
+def process_incident_route(incident_number: str):
     """Process a specific incident.
+    
+    Routes incident to the appropriate processor based on incident type:
+    - REDSHIFT_USER: Uses IncidentProcessor for Redshift user operations
+    - SECURITY_GROUP: Uses process_security_group_incident for SG modifications
     
     Validates that the incident belongs to WG101 group before processing.
     Returns error if incident is from a different group.
@@ -397,9 +572,52 @@ def process_incident(incident_number: str):
                 "required_group": required_group
             }), 400
         
-        # Proceed with processing
-        processor = IncidentProcessor(dry_run=dry_run)
-        result = processor.process_incident(incident_number)
+        # Detect incident type and route to appropriate processor
+        description = incident.get("description", "") or ""
+        short_desc = incident.get("short_description", "") or ""
+        incident_type = detect_incident_type(description, short_desc)
+        
+        result = None
+        
+        if incident_type == IncidentType.SECURITY_GROUP:
+            # Route to Security Group processor
+            # process_security_group_incident now returns a detailed dict with sg_details
+            sg_result = process_security_group_incident(incident_number)
+            
+            # Handle both new dict return and legacy bool return for compatibility
+            if isinstance(sg_result, dict):
+                result = {
+                    "incident_number": sg_result.get("incident_number", incident_number),
+                    "success": sg_result.get("success", False),
+                    "message": sg_result.get("message", "Security Group operation completed"),
+                    "incident_type": "SECURITY_GROUP",
+                    "actions": sg_result.get("actions", ["Security Group rule modification processed"]),
+                    "sg_details": sg_result.get("sg_details")
+                }
+            else:
+                # Legacy bool return - fallback
+                result = {
+                    "incident_number": incident_number,
+                    "success": bool(sg_result),
+                    "message": "Security Group operation completed successfully" if sg_result else "Security Group operation failed",
+                    "incident_type": "SECURITY_GROUP",
+                    "actions": ["Security Group rule modification processed"],
+                    "sg_details": None
+                }
+        elif incident_type == IncidentType.REDSHIFT_USER:
+            # Route to Redshift processor
+            processor = IncidentProcessor(dry_run=dry_run)
+            result = processor.process_incident(incident_number)
+            result["incident_type"] = "REDSHIFT_USER"
+        else:
+            # Unknown incident type
+            return jsonify({
+                "success": False,
+                "incident_number": incident_number,
+                "error": "Could not determine incident type. The incident description does not match any known patterns (Redshift User or Security Group).",
+                "error_code": "UNKNOWN_INCIDENT_TYPE",
+                "incident_type": "UNKNOWN"
+            }), 400
         
         # Store in history (persistent)
         add_to_history(result)

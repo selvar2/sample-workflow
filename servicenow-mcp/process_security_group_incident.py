@@ -678,8 +678,17 @@ def remove_outbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
 # Main Incident Processor
 # =============================================================================
 
-def process_incident(incident_number: str) -> bool:
-    """Process a ServiceNow incident for security group operations with all safety checks."""
+def process_incident(incident_number: str) -> Dict[str, Any]:
+    """Process a ServiceNow incident for security group operations with all safety checks.
+    
+    Returns:
+        Dict containing:
+        - success: bool indicating if operation succeeded
+        - incident_number: the incident number
+        - message: summary message
+        - actions: list of action descriptions
+        - sg_details: detailed security group operation results (similar to redshift details)
+    """
     
     print(f"Processing incident {incident_number}...")
     print("=" * 70)
@@ -691,7 +700,13 @@ def process_incident(incident_number: str) -> bool:
     
     if not result["success"]:
         print(f"✗ Failed to fetch incident: {result['message']}")
-        return False
+        return {
+            "success": False,
+            "incident_number": incident_number,
+            "message": f"Failed to fetch incident: {result['message']}",
+            "actions": [],
+            "sg_details": None
+        }
     
     incident = result["incident"]
     print(f"✓ Incident retrieved: {incident['number']}")
@@ -707,19 +722,43 @@ def process_incident(incident_number: str) -> bool:
     if not sg_request["operation"]:
         print("✗ Could not determine operation type")
         print("  ⚠ No action taken - operation must be explicitly specified")
-        return False
+        return {
+            "success": False,
+            "incident_number": incident_number,
+            "message": "Could not determine operation type - must be explicitly specified",
+            "actions": ["Failed to parse operation type from description"],
+            "sg_details": None
+        }
     
     if not sg_request["security_group_id"]:
         print("✗ Could not find security group ID")
-        return False
+        return {
+            "success": False,
+            "incident_number": incident_number,
+            "message": "Could not find security group ID in description",
+            "actions": ["Failed to parse security group ID"],
+            "sg_details": None
+        }
     
     if not sg_request["cidrs"]:
         print("✗ Could not find any CIDR range")
-        return False
+        return {
+            "success": False,
+            "incident_number": incident_number,
+            "message": "Could not find any CIDR range in description",
+            "actions": ["Failed to parse CIDR ranges"],
+            "sg_details": None
+        }
     
     if not sg_request["port"]:
         print("✗ Could not find port")
-        return False
+        return {
+            "success": False,
+            "incident_number": incident_number,
+            "message": "Could not find port in description",
+            "actions": ["Failed to parse port number"],
+            "sg_details": None
+        }
     
     # Display all detected CIDRs
     cidr_count = len(sg_request["cidrs"])
@@ -737,7 +776,17 @@ def process_incident(incident_number: str) -> bool:
     
     if not sg_info["success"]:
         print(f"✗ Security group verification failed: {sg_info.get('message')}")
-        return False
+        return {
+            "success": False,
+            "incident_number": incident_number,
+            "message": f"Security group verification failed: {sg_info.get('message')}",
+            "actions": ["Failed to verify security group exists"],
+            "sg_details": {
+                "security_group_id": sg_request["security_group_id"],
+                "region": sg_request["region"],
+                "error": sg_info.get('message')
+            }
+        }
     
     print(f"✓ Security group verified: {sg_info['security_group_name']}")
     
@@ -775,7 +824,17 @@ def process_incident(incident_number: str) -> bool:
     
     if sg_request["operation"] not in operation_map:
         print(f"✗ Unsupported operation: {sg_request['operation']}")
-        return False
+        return {
+            "success": False,
+            "incident_number": incident_number,
+            "message": f"Unsupported operation: {sg_request['operation']}",
+            "actions": [f"Unknown operation type: {sg_request['operation']}"],
+            "sg_details": {
+                "security_group_id": sg_request["security_group_id"],
+                "operation": sg_request["operation"],
+                "supported_operations": list(operation_map.keys())
+            }
+        }
     
     # Track results for each CIDR
     results = []
@@ -862,42 +921,103 @@ def process_incident(incident_number: str) -> bool:
     failed_count = sum(1 for r in results if r["status"] == "failed")
     total_count = len(results)
     
-    # Build work notes with all results
-    work_notes_lines = [
-        "═══════════════════════════════════════════",
-        "Actions Performed by MCP Server Automation",
-        "═══════════════════════════════════════════",
-        "",
-        f"Total CIDRs Processed: {total_count}",
-        f"  ✓ Success: {success_count}",
-        f"  ⊘ Skipped (already exists): {skipped_count}",
-        f"  ✗ Failed: {failed_count}",
-        ""
-    ]
+    # Build detailed work notes matching Redshift format
+    # Note: Hiding backup file paths and before/after rule counts per customer requirements
     
-    # Add details for each CIDR
+    # Build operation details text (similar to Redshift SQL statements)
+    operation_details_lines = []
+    for idx, r in enumerate(results, 1):
+        cidr = r['cidr']
+        port = sg_request['port']
+        protocol = sg_request['protocol']
+        
+        if r["status"] == "success":
+            operation_details_lines.append(f"{rule_direction.upper()}_RULE_{action_verb}:")
+            operation_details_lines.append(f"✓ Operation ID: {r.get('rule_id', 'N/A')}")
+            operation_details_lines.append(f"  CIDR: {cidr}")
+            operation_details_lines.append(f"  Port: {port}")
+            operation_details_lines.append(f"  Protocol: {protocol}")
+            operation_details_lines.append(f"  Status: Successfully {action_verb.lower()}")
+        elif r["status"] == "skipped":
+            operation_details_lines.append(f"{rule_direction.upper()}_RULE_CHECK:")
+            operation_details_lines.append(f"⊘ Existing Rule ID: {r.get('rule_id', 'N/A')}")
+            operation_details_lines.append(f"  CIDR: {cidr}")
+            operation_details_lines.append(f"  Port: {port}")
+            operation_details_lines.append(f"  Status: Already exists - no action needed")
+        else:
+            operation_details_lines.append(f"{rule_direction.upper()}_RULE_FAILED:")
+            operation_details_lines.append(f"✗ CIDR: {cidr}")
+            operation_details_lines.append(f"  Port: {port}")
+            operation_details_lines.append(f"  Error: {r.get('message', 'Unknown error')}")
+        operation_details_lines.append("")
+    
+    operation_details_text = "\n".join(operation_details_lines)
+    
+    # Build summary text (similar to Redshift summary)
+    summary_lines = []
     for r in results:
         if r["status"] == "success":
-            work_notes_lines.append(f"✓ {r['cidr']}:{sg_request['port']} - {rule_direction} rule {action_verb}")
-            work_notes_lines.append(f"    Rule ID: {r['rule_id']}")
+            summary_lines.append(f"✓ {rule_direction} rule {action_verb.lower()} for {r['cidr']}:{sg_request['port']}")
         elif r["status"] == "skipped":
-            work_notes_lines.append(f"⊘ {r['cidr']}:{sg_request['port']} - Already exists")
-            work_notes_lines.append(f"    Existing Rule ID: {r['rule_id']}")
+            summary_lines.append(f"⊘ Rule already exists for {r['cidr']}:{sg_request['port']} - no creation needed")
         else:
-            work_notes_lines.append(f"✗ {r['cidr']}:{sg_request['port']} - Failed")
-            work_notes_lines.append(f"    Error: {r['message']}")
+            summary_lines.append(f"✗ Failed to process {r['cidr']}:{sg_request['port']}")
+    summary_text = "\n".join(summary_lines)
     
-    work_notes_lines.extend([
-        "",
-        f"Security Group: {sg_request['security_group_id']} ({sg_info.get('security_group_name', 'N/A')})",
-        f"Region: {sg_request['region']}",
-        f"Protocol: {sg_request['protocol']}",
-        f"Description: {sg_request.get('description', 'MCP Server Automation')}",
-        f"Timestamp: {completion_time}",
-        "MCP Server Automation"
-    ])
+    # Determine overall status
+    if failed_count == 0 and success_count > 0:
+        status_header = f"=== TASK COMPLETED - Security Group Operations - {completion_time} ==="
+        status_footer = "✓ All operations completed successfully via AWS EC2 API"
+    elif failed_count == 0 and success_count == 0 and skipped_count > 0:
+        status_header = f"=== TASK COMPLETED - Security Group Operations - {completion_time} ==="
+        status_footer = "✓ All rules already exist - no changes needed"
+    else:
+        status_header = f"=== TASK PARTIALLY COMPLETED - Security Group Operations - {completion_time} ==="
+        status_footer = f"⚠ {success_count} succeeded, {failed_count} failed - please review"
     
-    work_notes = "\n".join(work_notes_lines)
+    # Build cluster association info if available
+    cluster_info_text = ""
+    if sg_request.get('cluster_identifier') and sg_request.get('cluster_type'):
+        cluster_info_text = f"""
+CLUSTER ASSOCIATION:
+- Cluster: {sg_request.get('cluster_identifier')}
+- Cluster Type: {sg_request.get('cluster_type')}
+- Security Group Association: Verified"""
+    
+    # Build complete work notes (detailed format like Redshift)
+    work_notes = f"""{status_header}
+
+SECURITY GROUP MCP SERVER OPERATIONS PERFORMED:
+
+VERIFY_SECURITY_GROUP:
+✓ Security Group ID: {sg_request['security_group_id']}
+  Security Group Name: {sg_info.get('security_group_name', 'N/A')}
+  VPC ID: {sg_info.get('vpc_id', 'N/A')}
+  Description: {sg_info.get('description', 'N/A')}
+  Status: Verified successfully
+{cluster_info_text}
+
+{operation_details_text}
+
+SUMMARY:
+{summary_text}
+
+OPERATIONS COMPLETED: {sg_request['operation'].replace('_', ' ').upper()}
+
+EXECUTION DETAILS:
+- Security Group: {sg_request['security_group_id']} ({sg_info.get('security_group_name', 'N/A')})
+- Region: {sg_request['region']}
+- Protocol: {sg_request['protocol']}
+- Port: {sg_request['port']}
+- Total CIDRs Processed: {total_count}
+- Success: {success_count} | Skipped: {skipped_count} | Failed: {failed_count}
+- Completion Time: {completion_time}
+
+{status_footer}
+
+NOTE: Incident remains open per automation rules - not closed/resolved.
+MCP Server Automation
+"""
     
     update_params = UpdateIncidentParams(incident_id=incident_number, work_notes=work_notes, state="2")
     update_result = update_incident(config, auth_manager, update_params)
@@ -918,13 +1038,87 @@ def process_incident(incident_number: str) -> bool:
     print(f"Backup: {os.path.basename(backup_file)}")
     print("=" * 70)
     
-    return failed_count == 0
+    # Build detailed actions list
+    actions = []
+    actions.append(f"Incident retrieved from ServiceNow")
+    actions.append(f"Parsed operation: {sg_request['operation'].replace('_', ' ').title()}")
+    actions.append(f"Security group verified: {sg_info.get('security_group_name', 'N/A')}")
+    actions.append(f"Before state captured: {len(before_rules)} rules")
+    for r in results:
+        if r["status"] == "success":
+            actions.append(f"{rule_direction} rule {action_verb.lower()} for {r['cidr']}:{sg_request['port']}")
+        elif r["status"] == "skipped":
+            actions.append(f"Rule skipped for {r['cidr']} (already exists)")
+        else:
+            actions.append(f"Failed to process {r['cidr']}: {r['message']}")
+    actions.append(f"After state captured: {len(after_rules)} rules")
+    actions.append(f"Terraform backup created: {os.path.basename(backup_file)}")
+    actions.append(f"Incident work notes updated")
+    
+    # Build detailed sg_details dict (similar to redshift details)
+    sg_details = {
+        "success": failed_count == 0,
+        "message": f"Successfully processed {success_count} CIDR(s)" if failed_count == 0 else f"Processing completed with {failed_count} failure(s)",
+        "security_group": {
+            "id": sg_request["security_group_id"],
+            "name": sg_info.get("security_group_name", "N/A"),
+            "vpc_id": sg_info.get("vpc_id", "N/A"),
+            "description": sg_info.get("description", "N/A"),
+            "owner_id": sg_info.get("owner_id", "N/A")
+        },
+        "operation": {
+            "type": sg_request["operation"],
+            "direction": rule_direction,
+            "action": action_verb
+        },
+        "request": {
+            "cidrs": sg_request["cidrs"],
+            "port": sg_request["port"],
+            "port_range_end": sg_request.get("port_range_end", sg_request["port"]),
+            "protocol": sg_request["protocol"],
+            "region": sg_request["region"],
+            "cluster_identifier": sg_request.get("cluster_identifier"),
+            "cluster_type": sg_request.get("cluster_type")
+        },
+        "results": {
+            "total_cidrs": total_count,
+            "success_count": success_count,
+            "skipped_count": skipped_count,
+            "failed_count": failed_count,
+            "cidr_details": results
+        },
+        "rules": {
+            "before_count": len(before_rules),
+            "after_count": len(after_rules),
+            "net_change": len(after_rules) - len(before_rules)
+        },
+        "backup": {
+            "file": os.path.basename(backup_file),
+            "path": backup_file
+        },
+        "timestamp": completion_time,
+        "incident_updated": update_result.success
+    }
+    
+    overall_success = failed_count == 0
+    return {
+        "success": overall_success,
+        "incident_number": incident_number,
+        "message": f"Security Group operation completed: {success_count} success, {skipped_count} skipped, {failed_count} failed" if overall_success else f"Security Group operation failed: {failed_count} CIDR(s) failed",
+        "actions": actions,
+        "sg_details": sg_details
+    }
 
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2:
         incident_number = sys.argv[1]
-        success = process_incident(incident_number)
+        result = process_incident(incident_number)
+        # Handle both new dict return and legacy bool return for compatibility
+        if isinstance(result, dict):
+            success = result.get("success", False)
+        else:
+            success = bool(result)
         sys.exit(0 if success else 1)
     else:
         print("Enhanced Security Group Incident Processor v2.0.0")
