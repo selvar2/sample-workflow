@@ -75,6 +75,10 @@ class AuthManager:
         """
         Get an OAuth token from ServiceNow.
         
+        Supports two grant types:
+        - client_credentials: Uses client_id and client_secret only
+        - password: Uses client_id, client_secret, username, and password
+        
         Raises:
             ValueError: If OAuth configuration is missing or token request fails.
         """
@@ -93,7 +97,7 @@ class AuthManager:
             instance_name = instance_parts[0].split("//")[-1]
             token_url = f"https://{instance_name}.service-now.com/oauth_token.do"
 
-        # Prepare Authorization header
+        # Prepare Authorization header with client credentials
         auth_str = f"{oauth_config.client_id}:{oauth_config.client_secret}"
         auth_header = base64.b64encode(auth_str.encode()).decode()
         headers = {
@@ -101,44 +105,61 @@ class AuthManager:
             "Content-Type": "application/x-www-form-urlencoded"
         }
 
-        # Try client_credentials grant first
-        data_client_credentials = {
-            "grant_type": "client_credentials"
-        }
+        # Determine grant type from config (default to client_credentials)
+        grant_type = getattr(oauth_config, 'grant_type', 'client_credentials') or 'client_credentials'
         
-        logger.info("Attempting client_credentials grant...")
-        response = requests.post(token_url, headers=headers, data=data_client_credentials)
-        
-        logger.info(f"client_credentials response status: {response.status_code}")
-        logger.info(f"client_credentials response body: {response.text}")
-        
-        if response.status_code == 200:
-            token_data = response.json()
-            self.token = token_data.get("access_token")
-            self.token_type = token_data.get("token_type", "Bearer")
-            return
+        logger.info(f"OAuth grant type: {grant_type}")
+        logger.info(f"OAuth token URL: {token_url}")
 
-        # Try password grant if client_credentials failed
-        if oauth_config.username and oauth_config.password:
-            data_password = {
+        if grant_type == "client_credentials":
+            # Try client_credentials grant
+            data = {"grant_type": "client_credentials"}
+            
+            logger.info("Attempting client_credentials grant...")
+            response = requests.post(token_url, headers=headers, data=data)
+            
+            logger.info(f"client_credentials response status: {response.status_code}")
+            logger.debug(f"client_credentials response body: {response.text}")
+            
+            if response.status_code == 200:
+                token_data = response.json()
+                self.token = token_data.get("access_token")
+                self.token_type = token_data.get("token_type", "Bearer")
+                logger.info("Successfully obtained OAuth token using client_credentials grant")
+                return
+            else:
+                logger.error(f"client_credentials grant failed: {response.status_code} - {response.text}")
+                raise ValueError(f"Failed to get OAuth token using client_credentials grant: {response.status_code} - {response.text}")
+        
+        elif grant_type == "password":
+            # Password grant requires username and password
+            if not oauth_config.username or not oauth_config.password:
+                raise ValueError("Username and password are required for OAuth password grant")
+            
+            data = {
                 "grant_type": "password",
                 "username": oauth_config.username,
                 "password": oauth_config.password
             }
             
             logger.info("Attempting password grant...")
-            response = requests.post(token_url, headers=headers, data=data_password)
+            response = requests.post(token_url, headers=headers, data=data)
             
             logger.info(f"password grant response status: {response.status_code}")
-            logger.info(f"password grant response body: {response.text}")
+            logger.debug(f"password grant response body: {response.text}")
             
             if response.status_code == 200:
                 token_data = response.json()
                 self.token = token_data.get("access_token")
                 self.token_type = token_data.get("token_type", "Bearer")
+                logger.info("Successfully obtained OAuth token using password grant")
                 return
-
-        raise ValueError("Failed to get OAuth token using both client_credentials and password grants.")
+            else:
+                logger.error(f"password grant failed: {response.status_code} - {response.text}")
+                raise ValueError(f"Failed to get OAuth token using password grant: {response.status_code} - {response.text}")
+        
+        else:
+            raise ValueError(f"Unsupported OAuth grant type: {grant_type}")
     
     def refresh_token(self):
         """Refresh the OAuth token if using OAuth authentication."""

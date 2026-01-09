@@ -91,6 +91,12 @@ def parse_args():
         help="OAuth token URL",
         default=os.environ.get("SERVICENOW_TOKEN_URL"),
     )
+    oauth_group.add_argument(
+        "--oauth-grant-type",
+        help="OAuth grant type (client_credentials or password)",
+        choices=["client_credentials", "password"],
+        default=os.environ.get("SERVICENOW_OAUTH_GRANT_TYPE", "client_credentials"),
+    )
 
     # API Key
     api_key_group = parser.add_argument_group("API Key Authentication")
@@ -163,30 +169,41 @@ def create_config(args) -> ServerConfig:
         final_auth_config = AuthConfig(type=auth_type, basic=basic_cfg)
 
     elif auth_type == AuthType.OAUTH:
-        # Simplified - assuming password grant for now based on previous args
+        # Support both client_credentials and password grant types
         client_id = args.client_id or os.getenv("SERVICENOW_CLIENT_ID")
         client_secret = args.client_secret or os.getenv("SERVICENOW_CLIENT_SECRET")
-        username = args.username or os.getenv("SERVICENOW_USERNAME")  # Needed for password grant
-        password = args.password or os.getenv("SERVICENOW_PASSWORD")  # Needed for password grant
+        grant_type = getattr(args, 'oauth_grant_type', None) or os.getenv("SERVICENOW_OAUTH_GRANT_TYPE", "client_credentials")
+        username = args.username or os.getenv("SERVICENOW_USERNAME")
+        password = args.password or os.getenv("SERVICENOW_PASSWORD")
         token_url = args.token_url or os.getenv("SERVICENOW_TOKEN_URL")
 
-        if not client_id or not client_secret or not username or not password:
+        if not client_id or not client_secret:
             raise ValueError(
-                "Client ID, client secret, username, and password are required for OAuth password grant"
-                " (--client-id/SERVICENOW_CLIENT_ID, etc.)"
+                "Client ID and client secret are required for OAuth authentication "
+                "(--client-id/SERVICENOW_CLIENT_ID, --client-secret/SERVICENOW_CLIENT_SECRET)"
             )
+        
+        # For password grant, username and password are required
+        if grant_type == "password":
+            if not username or not password:
+                raise ValueError(
+                    "Username and password are required for OAuth password grant "
+                    "(--username/SERVICENOW_USERNAME, --password/SERVICENOW_PASSWORD)"
+                )
+        
         if not token_url:
             # Attempt to construct default if not provided
             token_url = f"{instance_url}/oauth_token.do"
             logger.warning(f"OAuth token URL not provided, defaulting to: {token_url}")
 
-        # Create the specific config (without instance_url)
+        # Create the specific config
         oauth_cfg = OAuthConfig(
             client_id=client_id,
             client_secret=client_secret,
             username=username,
             password=password,
             token_url=token_url,
+            grant_type=grant_type,
         )
         # Create the main AuthConfig wrapper
         final_auth_config = AuthConfig(type=auth_type, oauth=oauth_cfg)

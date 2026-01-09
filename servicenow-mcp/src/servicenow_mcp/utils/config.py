@@ -24,13 +24,19 @@ class BasicAuthConfig(BaseModel):
 
 
 class OAuthConfig(BaseModel):
-    """Configuration for OAuth authentication."""
+    """Configuration for OAuth authentication.
+    
+    Supports two grant types:
+    - client_credentials: Only requires client_id and client_secret
+    - password: Requires client_id, client_secret, username, and password
+    """
 
     client_id: str
     client_secret: str
-    username: str
-    password: str
+    username: Optional[str] = None  # Required only for password grant
+    password: Optional[str] = None  # Required only for password grant
     token_url: Optional[str] = None
+    grant_type: str = "client_credentials"  # "client_credentials" or "password"
 
 
 class ApiKeyConfig(BaseModel):
