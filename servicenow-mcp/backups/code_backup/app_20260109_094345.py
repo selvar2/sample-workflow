@@ -752,51 +752,7 @@ def start_monitoring():
                     inc_number = inc.get("number")
                     processed_in_session.add(inc_number)
                     
-                    # Detect incident type and route to appropriate processor
-                    description = inc.get("description", "") or ""
-                    short_desc = inc.get("short_description", "") or ""
-                    incident_type = detect_incident_type(description, short_desc)
-                    
-                    result = None
-                    
-                    if incident_type == IncidentType.SECURITY_GROUP:
-                        # Route to Security Group processor
-                        sg_result = process_security_group_incident(inc_number)
-                        
-                        # Handle both new dict return and legacy bool return
-                        if isinstance(sg_result, dict):
-                            result = {
-                                "incident_number": sg_result.get("incident_number", inc_number),
-                                "success": sg_result.get("success", False),
-                                "message": sg_result.get("message", "Security Group operation completed"),
-                                "incident_type": "SECURITY_GROUP",
-                                "actions": sg_result.get("actions", ["Security Group rule modification processed"]),
-                                "sg_details": sg_result.get("sg_details")
-                            }
-                        else:
-                            # Legacy bool return - fallback
-                            result = {
-                                "incident_number": inc_number,
-                                "success": bool(sg_result),
-                                "message": "Security Group operation completed successfully" if sg_result else "Security Group operation failed",
-                                "incident_type": "SECURITY_GROUP",
-                                "actions": ["Security Group rule modification processed"],
-                                "sg_details": None
-                            }
-                    elif incident_type == IncidentType.REDSHIFT_USER:
-                        # Route to Redshift processor
-                        result = processor.process_incident(inc_number)
-                        result["incident_type"] = "REDSHIFT_USER"
-                    else:
-                        # Unknown incident type - skip with warning
-                        result = {
-                            "incident_number": inc_number,
-                            "success": False,
-                            "message": "Could not determine incident type from description",
-                            "incident_type": "UNKNOWN",
-                            "actions": ["Incident retrieved from ServiceNow"]
-                        }
-                    
+                    result = processor.process_incident(inc_number)
                     add_to_history(result)  # Persistent storage
                     
                     if result["success"]:
