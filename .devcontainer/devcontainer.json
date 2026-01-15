@@ -1,7 +1,7 @@
 {
   "name": "ServiceNow MCP Workflow",
   "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bullseye",
-  
+
   "features": {
     "ghcr.io/devcontainers/features/aws-cli:1": {
       "version": "latest"
@@ -40,7 +40,7 @@
   "postCreateCommand": "bash .devcontainer/setup.sh && bash .devcontainer/ensure-dependencies.sh && bash .devcontainer/setup-jules.sh && bash .devcontainer/setup-agents.sh",
   "postStartCommand": "bash .devcontainer/ensure-dependencies.sh && bash .devcontainer/setup-agents.sh && cd /workspaces/sample-workflow/servicenow-mcp && [ -d .venv ] && (.venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv boto3 flask flask-cors bcrypt) || (python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -e . && .venv/bin/pip install -q python-dotenv boto3 flask flask-cors bcrypt)",
   "postAttachCommand": "bash .devcontainer/ensure-dependencies.sh && bash .devcontainer/setup-agents.sh && cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate",
-  
+
   "remoteEnv": {
     "SERVICENOW_INSTANCE_URL": "${localEnv:SERVICENOW_INSTANCE_URL}",
     "SERVICENOW_USERNAME": "${localEnv:SERVICENOW_USERNAME}",
