@@ -14,7 +14,6 @@ class AuthType(str, Enum):
     BASIC = "basic"
     OAUTH = "oauth"
     API_KEY = "api_key"
-    OAUTH_WITH_BASIC_FALLBACK = "oauth_with_basic_fallback"  # Try OAuth first, fall back to basic
 
 
 class BasicAuthConfig(BaseModel):
@@ -54,7 +53,6 @@ class AuthConfig(BaseModel):
     basic: Optional[BasicAuthConfig] = None
     oauth: Optional[OAuthConfig] = None
     api_key: Optional[ApiKeyConfig] = None
-    enable_basic_fallback: bool = False  # If True, fall back to basic auth when OAuth fails
 
 
 class ServerConfig(BaseModel):

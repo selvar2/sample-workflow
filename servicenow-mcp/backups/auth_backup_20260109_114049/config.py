@@ -14,7 +14,6 @@ class AuthType(str, Enum):
     BASIC = "basic"
     OAUTH = "oauth"
     API_KEY = "api_key"
-    OAUTH_WITH_BASIC_FALLBACK = "oauth_with_basic_fallback"  # Try OAuth first, fall back to basic
 
 
 class BasicAuthConfig(BaseModel):
@@ -25,19 +24,13 @@ class BasicAuthConfig(BaseModel):
 
 
 class OAuthConfig(BaseModel):
-    """Configuration for OAuth authentication.
-    
-    Supports two grant types:
-    - client_credentials: Only requires client_id and client_secret
-    - password: Requires client_id, client_secret, username, and password
-    """
+    """Configuration for OAuth authentication."""
 
     client_id: str
     client_secret: str
-    username: Optional[str] = None  # Required only for password grant
-    password: Optional[str] = None  # Required only for password grant
+    username: str
+    password: str
     token_url: Optional[str] = None
-    grant_type: str = "client_credentials"  # "client_credentials" or "password"
 
 
 class ApiKeyConfig(BaseModel):
@@ -54,7 +47,6 @@ class AuthConfig(BaseModel):
     basic: Optional[BasicAuthConfig] = None
     oauth: Optional[OAuthConfig] = None
     api_key: Optional[ApiKeyConfig] = None
-    enable_basic_fallback: bool = False  # If True, fall back to basic auth when OAuth fails
 
 
 class ServerConfig(BaseModel):

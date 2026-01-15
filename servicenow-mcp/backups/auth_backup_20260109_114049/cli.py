@@ -56,15 +56,9 @@ def parse_args():
     auth_group = parser.add_argument_group("Authentication")
     auth_group.add_argument(
         "--auth-type",
-        choices=["basic", "oauth", "api_key", "oauth_with_basic_fallback"],
-        help="Authentication type (oauth_with_basic_fallback tries OAuth first, falls back to basic)",
+        choices=["basic", "oauth", "api_key"],
+        help="Authentication type",
         default=os.environ.get("SERVICENOW_AUTH_TYPE", "basic"),
-    )
-    auth_group.add_argument(
-        "--enable-basic-fallback",
-        action="store_true",
-        help="Enable fallback to basic auth if OAuth fails",
-        default=os.environ.get("SERVICENOW_BASIC_AUTH_FALLBACK", "").lower() in ("true", "1", "yes"),
     )
 
     # Basic auth
@@ -96,12 +90,6 @@ def parse_args():
         "--token-url",
         help="OAuth token URL",
         default=os.environ.get("SERVICENOW_TOKEN_URL"),
-    )
-    oauth_group.add_argument(
-        "--oauth-grant-type",
-        help="OAuth grant type (client_credentials or password)",
-        choices=["client_credentials", "password"],
-        default=os.environ.get("SERVICENOW_OAUTH_GRANT_TYPE", "client_credentials"),
     )
 
     # API Key
@@ -156,7 +144,6 @@ def create_config(args) -> ServerConfig:
 
     # Create authentication configuration based on args
     auth_type = AuthType(args.auth_type.lower())
-    enable_basic_fallback = getattr(args, 'enable_basic_fallback', False)
     # This will hold the final AuthConfig instance for ServerConfig
     final_auth_config: AuthConfig
 
@@ -175,68 +162,34 @@ def create_config(args) -> ServerConfig:
         # Create the main AuthConfig wrapper
         final_auth_config = AuthConfig(type=auth_type, basic=basic_cfg)
 
-    elif auth_type == AuthType.OAUTH or auth_type == AuthType.OAUTH_WITH_BASIC_FALLBACK:
-        # Support both client_credentials and password grant types
+    elif auth_type == AuthType.OAUTH:
+        # Simplified - assuming password grant for now based on previous args
         client_id = args.client_id or os.getenv("SERVICENOW_CLIENT_ID")
         client_secret = args.client_secret or os.getenv("SERVICENOW_CLIENT_SECRET")
-        grant_type = getattr(args, 'oauth_grant_type', None) or os.getenv("SERVICENOW_OAUTH_GRANT_TYPE", "client_credentials")
-        username = args.username or os.getenv("SERVICENOW_USERNAME")
-        password = args.password or os.getenv("SERVICENOW_PASSWORD")
+        username = args.username or os.getenv("SERVICENOW_USERNAME")  # Needed for password grant
+        password = args.password or os.getenv("SERVICENOW_PASSWORD")  # Needed for password grant
         token_url = args.token_url or os.getenv("SERVICENOW_TOKEN_URL")
 
-        # For oauth_with_basic_fallback, also prepare basic auth config
-        basic_cfg = None
-        if auth_type == AuthType.OAUTH_WITH_BASIC_FALLBACK or enable_basic_fallback:
-            if username and password:
-                basic_cfg = BasicAuthConfig(username=username, password=password)
-                logger.info("Basic auth fallback configured")
-            else:
-                logger.warning("Basic auth fallback requested but username/password not provided")
-
-        if not client_id or not client_secret:
-            # If we have fallback enabled and basic creds, allow missing OAuth creds
-            if basic_cfg:
-                logger.warning("OAuth credentials not provided, will use basic auth fallback")
-                final_auth_config = AuthConfig(
-                    type=auth_type, 
-                    basic=basic_cfg, 
-                    enable_basic_fallback=True
-                )
-            else:
-                raise ValueError(
-                    "Client ID and client secret are required for OAuth authentication "
-                    "(--client-id/SERVICENOW_CLIENT_ID, --client-secret/SERVICENOW_CLIENT_SECRET)"
-                )
-        else:
-            # For password grant, username and password are required
-            if grant_type == "password":
-                if not username or not password:
-                    raise ValueError(
-                        "Username and password are required for OAuth password grant "
-                        "(--username/SERVICENOW_USERNAME, --password/SERVICENOW_PASSWORD)"
-                    )
-            
-            if not token_url:
-                # Attempt to construct default if not provided
-                token_url = f"{instance_url}/oauth_token.do"
-                logger.warning(f"OAuth token URL not provided, defaulting to: {token_url}")
-
-            # Create the specific config
-            oauth_cfg = OAuthConfig(
-                client_id=client_id,
-                client_secret=client_secret,
-                username=username,
-                password=password,
-                token_url=token_url,
-                grant_type=grant_type,
+        if not client_id or not client_secret or not username or not password:
+            raise ValueError(
+                "Client ID, client secret, username, and password are required for OAuth password grant"
+                " (--client-id/SERVICENOW_CLIENT_ID, etc.)"
             )
-            # Create the main AuthConfig wrapper with optional basic fallback
-            final_auth_config = AuthConfig(
-                type=auth_type, 
-                oauth=oauth_cfg, 
-                basic=basic_cfg,
-                enable_basic_fallback=(auth_type == AuthType.OAUTH_WITH_BASIC_FALLBACK or enable_basic_fallback)
-            )
+        if not token_url:
+            # Attempt to construct default if not provided
+            token_url = f"{instance_url}/oauth_token.do"
+            logger.warning(f"OAuth token URL not provided, defaulting to: {token_url}")
+
+        # Create the specific config (without instance_url)
+        oauth_cfg = OAuthConfig(
+            client_id=client_id,
+            client_secret=client_secret,
+            username=username,
+            password=password,
+            token_url=token_url,
+        )
+        # Create the main AuthConfig wrapper
+        final_auth_config = AuthConfig(type=auth_type, oauth=oauth_cfg)
 
     elif auth_type == AuthType.API_KEY:
         api_key = args.api_key or os.getenv("SERVICENOW_API_KEY")
