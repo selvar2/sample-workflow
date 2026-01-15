@@ -1,4 +1,33 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+    "python.defaultInterpreterPath": "/workspaces/sample-workflow/servicenow-mcp/.venv/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "files.associations": {
+        "*.agent.md": "markdown"
+    },
+    "github.copilot.chat.codeGeneration.instructions": [
+        {
+            "text": "Custom agents are available in .github/agents/ directory. Use @agent-name to invoke specific agents."
+        }
+    ],
+    "github.copilot.chat.localeOverride": "en",
+    "github.copilot.enable": {
+        "*": true,
+        "markdown": true,
+        "plaintext": true
+    },
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/node_modules": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/.venv": true,
+        "**/dist": true
+    }
 }
