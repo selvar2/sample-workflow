@@ -1,3 +1,22 @@
+# ============================================================================
+# BACKUP FILE - Created: 2026-01-18 11:25:14 UTC
+# ============================================================================
+# 
+# PURPOSE: Backup before modifying incident state logic
+# 
+# CHANGES BEING MADE:
+# 1. Changed incident state from "2" (In Progress) to "6" (Resolved)
+# 2. Added close_code (resolution code) = "Solution provided"
+# 3. Added close_notes (resolution notes) = work notes content
+# 4. Updated message "NOTE: Incident remains open per automation rules"
+#    to "Incident resolved automatically by MCP Server Automation"
+# 
+# REASON: User requirement to automatically resolve incidents after
+#         successful processing instead of leaving them in "In Progress" state
+#
+# ORIGINAL FILE: See corresponding file without timestamp suffix
+# ============================================================================
+
 #!/usr/bin/env python
 """
 Enhanced Security Group Incident Processor v2.0.0
@@ -1015,18 +1034,11 @@ EXECUTION DETAILS:
 
 {status_footer}
 
-Incident resolved automatically by MCP Server Automation.
+NOTE: Incident remains open per automation rules - not closed/resolved.
+MCP Server Automation
 """
     
-    # CHANGE: 2026-01-18 - Changed from state="2" (In Progress) to state="6" (Resolved)
-    # Added close_code and close_notes for proper resolution per ServiceNow requirements
-    update_params = UpdateIncidentParams(
-        incident_id=incident_number,
-        work_notes=work_notes,
-        state="6",  # Resolved (changed from In Progress)
-        close_code="Solution provided",  # Resolution code
-        close_notes=work_notes  # Resolution notes - using work notes content
-    )
+    update_params = UpdateIncidentParams(incident_id=incident_number, work_notes=work_notes, state="2")
     update_result = update_incident(config, auth_manager, update_params)
     
     if update_result.success:

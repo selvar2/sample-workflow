@@ -1,3 +1,22 @@
+# ============================================================================
+# BACKUP FILE - Created: 2026-01-18 11:25:14 UTC
+# ============================================================================
+# 
+# PURPOSE: Backup before modifying incident state logic
+# 
+# CHANGES BEING MADE:
+# 1. Changed incident state from "2" (In Progress) to "6" (Resolved)
+# 2. Added close_code (resolution code) = "Solution provided"
+# 3. Added close_notes (resolution notes) = work notes content
+# 4. Updated message "NOTE: Incident remains open per automation rules"
+#    to "Incident resolved automatically by MCP Server Automation"
+# 
+# REASON: User requirement to automatically resolve incidents after
+#         successful processing instead of leaving them in "In Progress" state
+#
+# ORIGINAL FILE: See corresponding file without timestamp suffix
+# ============================================================================
+
 #!/usr/bin/env python
 """
 Script to process the ServiceNow incident by performing the required database operation.
@@ -174,15 +193,11 @@ Completion timestamp: {completion_time}
 MCP Server: ServiceNow MCP v0.1.0
 Processed by: Automated incident handling system"""
 
-# CHANGE: 2026-01-18 - Changed from state="2" (In Progress) to state="6" (Resolved)
-# Added close_code and close_notes for proper resolution per ServiceNow requirements
 update_params = UpdateIncidentParams(
     incident_id=incident_number,
     work_notes=work_notes,
-    state="6",  # Resolved (changed from In Progress)
+    state="2",  # In Progress
     assigned_to="",  # Can be set to specific user if needed
-    close_code="Solution provided",  # Resolution code
-    close_notes=work_notes,  # Resolution notes - using work notes content
 )
 
 update_result = update_incident(config, auth_manager, update_params)
@@ -201,7 +216,7 @@ print("OPERATION SUMMARY")
 print("=" * 70)
 print(f"✓ Incident {incident_number} processed successfully")
 print(f"✓ Database user '{db_user}' created in redshift-cluster-{cluster_id}")
-print(f"✓ Incident updated with work notes and status changed to 'Resolved'")
+print(f"✓ Incident updated with work notes and status changed to 'In Progress'")
 print(f"✓ Completion time: {completion_time}")
 print("\nThe MCP server has successfully:")
 print("  1. Read the incident from ServiceNow")

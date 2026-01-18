@@ -1,3 +1,22 @@
+# ============================================================================
+# BACKUP FILE - Created: 2026-01-18 11:25:14 UTC
+# ============================================================================
+# 
+# PURPOSE: Backup before modifying incident state logic
+# 
+# CHANGES BEING MADE:
+# 1. Changed incident state from "2" (In Progress) to "6" (Resolved)
+# 2. Added close_code (resolution code) = "Solution provided"
+# 3. Added close_notes (resolution notes) = work notes content
+# 4. Updated message "NOTE: Incident remains open per automation rules"
+#    to "Incident resolved automatically by MCP Server Automation"
+# 
+# REASON: User requirement to automatically resolve incidents after
+#         successful processing instead of leaving them in "In Progress" state
+#
+# ORIGINAL FILE: See corresponding file without timestamp suffix
+# ============================================================================
+
 #!/usr/bin/env python3
 """
 ServiceNow Incident Processor with AWS Redshift Integration
@@ -177,40 +196,6 @@ class ServiceNowClient:
             return True
         except Exception as e:
             logger.error(f"Failed to add work note to {incident_number}: {e}")
-            return False
-    
-    # CHANGE: 2026-01-18 - Added resolve_incident method to set incidents to Resolved state
-    # with resolution_code and resolution_notes per ServiceNow requirements
-    def resolve_incident(self, incident_number: str, resolution_notes: str) -> bool:
-        """Resolve an incident with resolution code and notes.
-        
-        Args:
-            incident_number: The incident number to resolve
-            resolution_notes: The resolution notes (typically the work notes content)
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        # First get the sys_id
-        incident = self.get_incident(incident_number)
-        if not incident:
-            return False
-        
-        sys_id = incident.get("sys_id")
-        url = f"{self.base_url}/api/now/table/incident/{sys_id}"
-        data = {
-            "state": "6",  # Resolved
-            "close_code": "Solution provided",  # Resolution code
-            "close_notes": resolution_notes,  # Resolution notes
-        }
-        
-        try:
-            response = self.requests.put(url, auth=self.auth, json=data, headers=self.headers)
-            response.raise_for_status()
-            logger.info(f"Incident {incident_number} resolved successfully")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to resolve incident {incident_number}: {e}")
             return False
     
     def is_already_processed(self, incident: Dict[str, Any]) -> bool:
@@ -839,15 +824,6 @@ class IncidentProcessor:
             self.snow_client.add_work_note(incident_number, task2_note)
         result["actions"].append("Task 2 work note added")
         
-        # CHANGE: 2026-01-18 - Added Step 7 to resolve incident after successful processing
-        # Step 7: Resolve the incident if operations were successful
-        if redshift_result["success"] and not self.dry_run:
-            # Use task2_note as resolution notes (contains the completion details)
-            if self.snow_client.resolve_incident(incident_number, task2_note):
-                result["actions"].append("Incident resolved with resolution code 'Solution provided'")
-            else:
-                logger.warning(f"Failed to resolve incident {incident_number}, but operations completed")
-        
         result["success"] = redshift_result["success"]
         result["message"] = redshift_result["message"]
         
@@ -1283,7 +1259,7 @@ EXECUTION DETAILS:
 
 ✓ All operations completed successfully via AWS Redshift Data API
 
-Incident resolved automatically by MCP Server Automation.
+NOTE: Incident remains open per automation rules - not closed/resolved.
 """
         
         # Error case
