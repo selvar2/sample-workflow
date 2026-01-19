@@ -30,7 +30,7 @@ if sys.platform == 'win32':
 
 import json
 import re
-import subprocess
+import boto3
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Tuple
 from dotenv import load_dotenv
@@ -43,6 +43,42 @@ from servicenow_mcp.tools.incident_tools import (
     GetIncidentByNumberParams,
     UpdateIncidentParams
 )
+
+# =============================================================================
+# AWS boto3 Client Helper
+# =============================================================================
+
+def get_ec2_client(region: str = 'us-east-1'):
+    """Get boto3 EC2 client with explicit credentials from environment."""
+    # Remove AWS_PROFILE to avoid profile lookup issues
+    aws_profile = os.environ.pop('AWS_PROFILE', None)
+    
+    session = boto3.Session(
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        region_name=region
+    )
+    
+    # Restore AWS_PROFILE if it was set
+    if aws_profile:
+        os.environ['AWS_PROFILE'] = aws_profile
+    
+    return session.client('ec2')
+
+def get_redshift_client(region: str = 'us-east-1'):
+    """Get boto3 Redshift client with explicit credentials from environment."""
+    aws_profile = os.environ.pop('AWS_PROFILE', None)
+    
+    session = boto3.Session(
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        region_name=region
+    )
+    
+    if aws_profile:
+        os.environ['AWS_PROFILE'] = aws_profile
+    
+    return session.client('redshift')
 
 # Load environment variables
 load_dotenv()
@@ -83,16 +119,9 @@ auth_manager = AuthManager(config.auth, config.instance_url)
 
 def get_security_group_details(sg_id: str, region: str) -> Dict[str, Any]:
     """Fetch complete security group details including name, VPC, and description."""
-    cmd = [
-        "aws", "ec2", "describe-security-groups",
-        "--group-ids", sg_id,
-        "--region", region,
-        "--no-cli-pager"
-    ]
-    
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        response = json.loads(result.stdout)
+        ec2 = get_ec2_client(region)
+        response = ec2.describe_security_groups(GroupIds=[sg_id])
         if response.get("SecurityGroups"):
             sg = response["SecurityGroups"][0]
             return {
@@ -105,26 +134,19 @@ def get_security_group_details(sg_id: str, region: str) -> Dict[str, Any]:
                 "tags": {tag["Key"]: tag["Value"] for tag in sg.get("Tags", [])}
             }
         return {"success": False, "message": "Security group not found"}
-    except subprocess.CalledProcessError as e:
-        return {"success": False, "message": f"Error: {e.stderr or str(e)}"}
-    except json.JSONDecodeError as e:
-        return {"success": False, "message": f"JSON parse error: {str(e)}"}
+    except Exception as e:
+        return {"success": False, "message": f"Error: {str(e)}"}
 
 
 def get_security_group_rules(sg_id: str, region: str, rule_type: str = "inbound") -> Dict[str, Any]:
     """Fetch all rules for a security group."""
     is_egress = rule_type == "outbound"
     
-    cmd = [
-        "aws", "ec2", "describe-security-group-rules",
-        "--filter", f"Name=group-id,Values={sg_id}",
-        "--region", region,
-        "--no-cli-pager"
-    ]
-    
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        response = json.loads(result.stdout)
+        ec2 = get_ec2_client(region)
+        response = ec2.describe_security_group_rules(
+            Filters=[{'Name': 'group-id', 'Values': [sg_id]}]
+        )
         all_rules = response.get("SecurityGroupRules", [])
         filtered_rules = [r for r in all_rules if r.get("IsEgress") == is_egress]
         
@@ -133,24 +155,16 @@ def get_security_group_rules(sg_id: str, region: str, rule_type: str = "inbound"
             "rules": filtered_rules,
             "all_rules": all_rules
         }
-    except subprocess.CalledProcessError as e:
-        return {"success": False, "message": f"Error: {e.stderr or str(e)}", "rules": []}
-    except json.JSONDecodeError as e:
-        return {"success": False, "message": f"JSON parse error: {str(e)}", "rules": []}
+    except Exception as e:
+        return {"success": False, "message": f"Error: {str(e)}", "rules": []}
 
 
 def get_cluster_security_groups(cluster_identifier: str, region: str, cluster_type: str = "redshift") -> Dict[str, Any]:
     """Get security groups associated with a cluster (supports redshift, rds)."""
     if cluster_type == "redshift":
-        cmd = [
-            "aws", "redshift", "describe-clusters",
-            "--cluster-identifier", cluster_identifier,
-            "--region", region,
-            "--no-cli-pager"
-        ]
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            response = json.loads(result.stdout)
+            redshift = get_redshift_client(region)
+            response = redshift.describe_clusters(ClusterIdentifier=cluster_identifier)
             clusters = response.get("Clusters", [])
             if clusters:
                 vpc_sgs = clusters[0].get("VpcSecurityGroups", [])
@@ -162,8 +176,8 @@ def get_cluster_security_groups(cluster_identifier: str, region: str, cluster_ty
                     "vpc_id": clusters[0].get("VpcId")
                 }
             return {"success": False, "message": "Cluster not found", "security_groups": []}
-        except subprocess.CalledProcessError as e:
-            return {"success": False, "message": f"Error: {e.stderr or str(e)}", "security_groups": []}
+        except Exception as e:
+            return {"success": False, "message": f"Error: {str(e)}", "security_groups": []}
     
     return {"success": False, "message": f"Unsupported cluster type: {cluster_type}", "security_groups": []}
 
@@ -553,37 +567,30 @@ def add_inbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
     protocol = sg_details["protocol"]
     description = sg_details.get("description", "MCP Server Automation")
     
-    ip_permissions = json.dumps([{
+    ip_permissions = [{
         "IpProtocol": protocol,
         "FromPort": port,
         "ToPort": port_end,
         "IpRanges": [{"CidrIp": cidr, "Description": description}]
-    }])
-    
-    cmd = [
-        "aws", "ec2", "authorize-security-group-ingress",
-        "--group-id", sg_id,
-        "--region", region,
-        "--ip-permissions", ip_permissions,
-        "--no-cli-pager"
-    ]
+    }]
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        response = json.loads(result.stdout)
+        ec2 = get_ec2_client(region)
+        response = ec2.authorize_security_group_ingress(
+            GroupId=sg_id,
+            IpPermissions=ip_permissions
+        )
         return {
             "success": True,
             "message": "Inbound rule added successfully",
-            "rule_id": response.get("SecurityGroupRules", [{}])[0].get("SecurityGroupRuleId", "N/A"),
+            "rule_id": response.get("SecurityGroupRules", [{}])[0].get("SecurityGroupRuleId", "N/A") if response.get("SecurityGroupRules") else "N/A",
             "details": response
         }
-    except subprocess.CalledProcessError as e:
-        error_msg = e.stderr or str(e)
+    except Exception as e:
+        error_msg = str(e)
         if "already exists" in error_msg.lower() or "duplicate" in error_msg.lower():
             return {"success": False, "message": f"Rule already exists: {error_msg}", "details": None}
         return {"success": False, "message": f"Failed to add rule: {error_msg}", "details": None}
-    except json.JSONDecodeError:
-        return {"success": True, "message": "Inbound rule added", "rule_id": "N/A", "details": None}
 
 
 def add_outbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
@@ -596,34 +603,27 @@ def add_outbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
     protocol = sg_details["protocol"]
     description = sg_details.get("description", "MCP Server Automation")
     
-    ip_permissions = json.dumps([{
+    ip_permissions = [{
         "IpProtocol": protocol,
         "FromPort": port,
         "ToPort": port_end,
         "IpRanges": [{"CidrIp": cidr, "Description": description}]
-    }])
-    
-    cmd = [
-        "aws", "ec2", "authorize-security-group-egress",
-        "--group-id", sg_id,
-        "--region", region,
-        "--ip-permissions", ip_permissions,
-        "--no-cli-pager"
-    ]
+    }]
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        response = json.loads(result.stdout)
+        ec2 = get_ec2_client(region)
+        response = ec2.authorize_security_group_egress(
+            GroupId=sg_id,
+            IpPermissions=ip_permissions
+        )
         return {
             "success": True,
             "message": "Outbound rule added successfully",
-            "rule_id": response.get("SecurityGroupRules", [{}])[0].get("SecurityGroupRuleId", "N/A"),
+            "rule_id": response.get("SecurityGroupRules", [{}])[0].get("SecurityGroupRuleId", "N/A") if response.get("SecurityGroupRules") else "N/A",
             "details": response
         }
-    except subprocess.CalledProcessError as e:
-        return {"success": False, "message": f"Failed to add rule: {e.stderr or str(e)}", "details": None}
-    except json.JSONDecodeError:
-        return {"success": True, "message": "Outbound rule added", "rule_id": "N/A", "details": None}
+    except Exception as e:
+        return {"success": False, "message": f"Failed to add rule: {str(e)}", "details": None}
 
 
 def remove_inbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
@@ -635,26 +635,22 @@ def remove_inbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
     port_end = sg_details.get("port_range_end", port)
     protocol = sg_details["protocol"]
     
-    ip_permissions = json.dumps([{
+    ip_permissions = [{
         "IpProtocol": protocol,
         "FromPort": port,
         "ToPort": port_end,
         "IpRanges": [{"CidrIp": cidr}]
-    }])
-    
-    cmd = [
-        "aws", "ec2", "revoke-security-group-ingress",
-        "--group-id", sg_id,
-        "--region", region,
-        "--ip-permissions", ip_permissions,
-        "--no-cli-pager"
-    ]
+    }]
     
     try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        ec2 = get_ec2_client(region)
+        ec2.revoke_security_group_ingress(
+            GroupId=sg_id,
+            IpPermissions=ip_permissions
+        )
         return {"success": True, "message": "Inbound rule removed successfully", "details": None}
-    except subprocess.CalledProcessError as e:
-        return {"success": False, "message": f"Failed to remove rule: {e.stderr or str(e)}", "details": None}
+    except Exception as e:
+        return {"success": False, "message": f"Failed to remove rule: {str(e)}", "details": None}
 
 
 def remove_outbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
@@ -666,26 +662,22 @@ def remove_outbound_rule(sg_details: Dict[str, Any]) -> Dict[str, Any]:
     port_end = sg_details.get("port_range_end", port)
     protocol = sg_details["protocol"]
     
-    ip_permissions = json.dumps([{
+    ip_permissions = [{
         "IpProtocol": protocol,
         "FromPort": port,
         "ToPort": port_end,
         "IpRanges": [{"CidrIp": cidr}]
-    }])
-    
-    cmd = [
-        "aws", "ec2", "revoke-security-group-egress",
-        "--group-id", sg_id,
-        "--region", region,
-        "--ip-permissions", ip_permissions,
-        "--no-cli-pager"
-    ]
+    }]
     
     try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        ec2 = get_ec2_client(region)
+        ec2.revoke_security_group_egress(
+            GroupId=sg_id,
+            IpPermissions=ip_permissions
+        )
         return {"success": True, "message": "Outbound rule removed successfully", "details": None}
-    except subprocess.CalledProcessError as e:
-        return {"success": False, "message": f"Failed to remove rule: {e.stderr or str(e)}", "details": None}
+    except Exception as e:
+        return {"success": False, "message": f"Failed to remove rule: {str(e)}", "details": None}
 
 
 # =============================================================================

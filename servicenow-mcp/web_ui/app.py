@@ -915,22 +915,27 @@ def test_connection():
     
     # Test AWS
     try:
-        import subprocess
-        result = subprocess.run(
-            ["aws", "sts", "get-caller-identity", "--no-cli-pager"],
-            capture_output=True, text=True, timeout=10
+        import boto3
+        # Remove AWS_PROFILE to avoid profile lookup issues
+        aws_profile = os.environ.pop('AWS_PROFILE', None)
+        
+        # Create session with explicit credentials
+        session = boto3.Session(
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            region_name=os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
         )
-        if result.returncode == 0:
-            identity = json.loads(result.stdout)
-            results["aws"] = {
-                "success": True,
-                "message": f"Connected as {identity.get('Arn', 'Unknown')}"
-            }
-        else:
-            results["aws"] = {
-                "success": False,
-                "message": result.stderr
-            }
+        sts = session.client('sts')
+        identity = sts.get_caller_identity()
+        
+        # Restore AWS_PROFILE if it was set
+        if aws_profile:
+            os.environ['AWS_PROFILE'] = aws_profile
+            
+        results["aws"] = {
+            "success": True,
+            "message": f"Connected as {identity.get('Arn', 'Unknown')}"
+        }
     except Exception as e:
         results["aws"] = {
             "success": False,

@@ -257,13 +257,27 @@ class RedshiftClient:
         self.region = Config.AWS_REGION
         self.dry_run = dry_run
         self._client = None
+        self._session = None
     
     @property
     def client(self):
-        """Lazy-load boto3 client."""
+        """Lazy-load boto3 client with explicit credentials."""
         if self._client is None:
             import boto3
-            self._client = boto3.client('redshift-data', region_name=self.region)
+            # Remove AWS_PROFILE to avoid profile lookup issues
+            aws_profile = os.environ.pop('AWS_PROFILE', None)
+            
+            # Create session with explicit credentials from environment
+            self._session = boto3.Session(
+                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+                region_name=self.region
+            )
+            self._client = self._session.client('redshift-data')
+            
+            # Restore AWS_PROFILE if it was set
+            if aws_profile:
+                os.environ['AWS_PROFILE'] = aws_profile
         return self._client
     
     def _execute_statement(self, sql: str) -> Tuple[bool, str, Optional[str]]:
