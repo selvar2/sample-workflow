@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 ServiceNow Incident Processor - Web User Interface
 
@@ -13,20 +12,6 @@ A Flask-based web application that provides a user-friendly interface for:
 
 import os
 import sys
-
-# ============================================================================
-# Windows UTF-8 Encoding Fix
-# ============================================================================
-# Fix for Windows console encoding issues with Unicode characters (✓, ✗, etc.)
-if sys.platform == 'win32':
-    os.environ['PYTHONIOENCODING'] = 'utf-8'
-    if hasattr(sys.stdout, 'reconfigure'):
-        try:
-            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-        except Exception:
-            pass
-
 import json
 import threading
 import queue

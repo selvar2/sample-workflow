@@ -38,20 +38,6 @@ from datetime import datetime
 from typing import Optional, Dict, Any, Tuple
 from dotenv import load_dotenv
 
-# ============================================================================
-# Windows UTF-8 Encoding Fix
-# ============================================================================
-# Fix for Windows console encoding issues with Unicode characters (✓, ✗, etc.)
-if sys.platform == 'win32':
-    os.environ['PYTHONIOENCODING'] = 'utf-8'
-    # Reconfigure stdout/stderr if Python 3.7+
-    if hasattr(sys.stdout, 'reconfigure'):
-        try:
-            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-        except Exception:
-            pass
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
