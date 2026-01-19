@@ -873,19 +873,17 @@ class IncidentProcessor:
         redshift_result = self._execute_redshift_operations(parsed)
         result["redshift"] = redshift_result
         
-        # Step 6: Add Task 2 work note (detailed operations log)
+        # Step 6: Add Task 2 work note
         task2_note = self._generate_task2_note(parsed, redshift_result)
         if not self.dry_run:
             self.snow_client.add_work_note(incident_number, task2_note)
         result["actions"].append("Task 2 work note added")
         
-        # CHANGE: 2026-01-19 - Fixed duplicate work notes issue
+        # CHANGE: 2026-01-18 - Added Step 7 to resolve incident after successful processing
         # Step 7: Resolve the incident if operations were successful
-        # Use a CONCISE resolution summary instead of repeating the full task2 note
         if redshift_result["success"] and not self.dry_run:
-            # Generate concise resolution summary (not the full detailed note)
-            resolution_summary = self._generate_resolution_summary(parsed, redshift_result)
-            if self.snow_client.resolve_incident(incident_number, resolution_summary):
+            # Use task2_note as resolution notes (contains the completion details)
+            if self.snow_client.resolve_incident(incident_number, task2_note):
                 result["actions"].append("Incident resolved with resolution code 'Solution provided'")
             else:
                 logger.warning(f"Failed to resolve incident {incident_number}, but operations completed")
@@ -1346,44 +1344,6 @@ REQUESTED DETAILS:
 
 Please review and take manual action if required.
 """
-    
-    # CHANGE: 2026-01-19 - Added concise resolution summary to prevent duplicate work notes
-    # Previously, the full task2_note was used for both work_notes AND resolution_notes,
-    # causing the same detailed content to appear twice in ServiceNow.
-    # This method generates a brief summary for resolution_notes only.
-    def _generate_resolution_summary(self, parsed: Dict[str, Any], redshift_result: Dict[str, Any]) -> str:
-        """Generate a concise resolution summary for the incident.
-        
-        This is separate from Task 2 note to avoid duplicate content in ServiceNow.
-        Task 2 note = Detailed work notes (operations log)
-        Resolution summary = Brief summary for close_notes field
-        """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-        
-        # Build brief summary of what was done
-        summary_items = []
-        if redshift_result.get("user_existed"):
-            summary_items.append(f"User '{parsed.get('username')}' verified (already exists)")
-        elif redshift_result.get("user_created"):
-            summary_items.append(f"User '{parsed.get('username')}' created")
-        
-        if redshift_result.get("group_existed") or redshift_result.get("group_created"):
-            summary_items.append(f"Group '{parsed.get('group_name')}' configured")
-        
-        if redshift_result.get("privileges_granted"):
-            summary_items.append("Privileges granted")
-        
-        if redshift_result.get("user_added_to_group"):
-            summary_items.append(f"User added to group")
-        
-        summary_text = ", ".join(summary_items) if summary_items else "Operations completed"
-        
-        return f"""Resolved by MCP Server Automation - {timestamp}
-
-Summary: {summary_text}
-Cluster: {parsed.get('cluster', 'N/A')}
-
-See work notes for detailed operation logs."""
     
     def _add_error_work_note(self, incident_number: str, error_msg: str, parsed: Dict[str, Any]):
         """Add error work note to incident."""
