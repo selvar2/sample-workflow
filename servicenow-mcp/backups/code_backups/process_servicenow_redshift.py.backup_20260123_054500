@@ -324,41 +324,16 @@ class RedshiftClient:
         
         return False, statement_id
     
-    def create_user(self, username: str, password_type: str = "DISABLE", password_value: str = None) -> Tuple[bool, str, Optional[str]]:
-        """
-        Create a new user with specified password authentication method.
-        
-        Supports three password authentication methods:
-        1. MD5 Hash (password_type="MD5") - Uses pre-computed MD5 hash
-        2. Static Password (password_type="PLAINTEXT") - Uses plaintext password
-        3. Password Disabled (password_type="DISABLE") - IAM-only authentication
-        
-        Args:
-            username: The username to create
-            password_type: One of "MD5", "PLAINTEXT", or "DISABLE"
-            password_value: The password or MD5 hash value (None for DISABLE)
+    def create_user(self, username: str) -> Tuple[bool, str, Optional[str]]:
+        """Create a new user with password disabled.
         
         Returns:
             Tuple of (success, statement_id, error_or_info)
             - If user is created: (True, statement_id, None)
             - If user already exists: (True, statement_id, "USER_EXISTS")
             - If other error: (False, statement_id, error_message)
-        
-        Change Log:
-        - 2026-01-23: Added support for MD5 hash and static password authentication
-                      Previously only supported PASSWORD DISABLE
         """
-        # Generate SQL based on password type
-        if password_type == "MD5":
-            # MD5 hash already includes 'md5' prefix
-            sql = f"CREATE USER {username} PASSWORD '{password_value}';"
-            logger.info(f"Creating user '{username}' with MD5 hash authentication")
-        elif password_type == "PLAINTEXT":
-            sql = f"CREATE USER {username} PASSWORD '{password_value}';"
-            logger.info(f"Creating user '{username}' with static password authentication")
-        else:  # DISABLE
-            sql = f"CREATE USER {username} PASSWORD DISABLE;"
-            logger.info(f"Creating user '{username}' with password disabled (IAM-only)")
+        sql = f"CREATE USER {username} PASSWORD DISABLE;"
         
         success, statement_id, error = self._execute_statement(sql)
         if not success:
@@ -655,65 +630,21 @@ class IncidentParser:
         return "ALL"
     
     @staticmethod
-    def extract_password_setting(description: str) -> tuple:
-        """
-        Extract password setting from incident description.
-        
-        Supports three password authentication methods:
-        1. MD5 Hash - User provides pre-computed MD5 hash for password authentication
-           Example: "with md5hash b14c23f726855ee619e85b3d91505273"
-           
-        2. Static Password - User provides plaintext password directly
-           Example: "with password your_pwd_123"
-           
-        3. Password Disabled - IAM-only authentication (no password)
-           Example: "with password disabled"
-        
-        Returns:
-            tuple: (password_type, password_value)
-            - ("MD5", "md5<hash>") for MD5 hash authentication
-            - ("PLAINTEXT", "<password>") for static password
-            - ("DISABLE", None) for password disabled
-        
-        Change Log:
-        - 2026-01-23: Enhanced to support MD5 hash and static password authentication
-                      Previously only supported PASSWORD DISABLE
-        """
+    def extract_password_setting(description: str) -> str:
+        """Extract password setting from incident description."""
         if not description:
-            return ("DISABLE", None)
+            return "DISABLE"
         
-        # Check for MD5 hash pattern (check first - most specific)
-        # Patterns: "md5hash <hash>", "md5 hash <hash>", "md5hash: <hash>"
-        md5_match = re.search(
-            r'md5\s*hash[:\s]+([a-fA-F0-9]{32})',
-            description,
-            re.IGNORECASE
-        )
-        if md5_match:
-            md5_hash = md5_match.group(1).lower()
-            # Redshift expects 'md5' prefix on the hash
-            return ("MD5", f"md5{md5_hash}")
-        
-        # Check for PASSWORD DISABLE/DISABLED pattern
+        # Check for PASSWORD DISABLE
         if re.search(r'password[:\s]*(disable|disabled)', description, re.IGNORECASE):
-            return ("DISABLE", None)
+            return "DISABLE"
         
-        # Check for static password pattern
-        # Patterns: "password <pwd>", "password: <pwd>", "with password <pwd>"
-        # Exclude: "password disabled", "password disable"
-        password_match = re.search(
-            r'(?:with\s+)?password[:\s]+[\'"]?([^\s\'\"]+)[\'"]?',
-            description,
-            re.IGNORECASE
-        )
-        if password_match:
-            password_value = password_match.group(1)
-            # Skip if it's "disable" or "disabled"
-            if password_value.lower() not in ['disable', 'disabled']:
-                return ("PLAINTEXT", password_value)
+        # Check for specific password
+        match = re.search(r'password[:\s]+[\'"]?(\w+)[\'"]?', description, re.IGNORECASE)
+        if match and match.group(1).lower() not in ['disable', 'disabled']:
+            return match.group(1)
         
-        # Default to password disabled
-        return ("DISABLE", None)
+        return "DISABLE"
     
     @staticmethod
     def extract_operations(description: str) -> list:
@@ -1032,24 +963,8 @@ class IncidentProcessor:
         
         return result
     
-    def _execute_create_user(self, redshift: RedshiftClient, username: str, password_setting, result: Dict) -> Dict:
-        """
-        Execute CREATE USER operation.
-        
-        Args:
-            redshift: RedshiftClient instance
-            username: Username to create
-            password_setting: Either a tuple (password_type, password_value) or legacy string
-                - Tuple format: ("MD5", "md5<hash>") | ("PLAINTEXT", "<password>") | ("DISABLE", None)
-                - Legacy string: "DISABLE" or a password string
-            result: Result dictionary to update
-        
-        Returns:
-            Dict with operation result
-        
-        Change Log:
-        - 2026-01-23: Updated to handle tuple password_setting for MD5/PLAINTEXT/DISABLE support
-        """
+    def _execute_create_user(self, redshift: RedshiftClient, username: str, password_setting: str, result: Dict) -> Dict:
+        """Execute CREATE USER operation."""
         op_result = {"success": False}
         
         # Check if user exists
@@ -1068,35 +983,14 @@ class IncidentProcessor:
             logger.info(op_result["message"])
             return op_result
         
-        # Create user with appropriate password setting
-        # password_setting is now a tuple: (password_type, password_value)
-        # - ("MD5", "md5<hash>") for MD5 hash authentication
-        # - ("PLAINTEXT", "<password>") for static password
-        # - ("DISABLE", None) for password disabled
+        # Create user
         logger.info(f"Creating user '{username}'...")
-        
-        # Handle both old string format and new tuple format for backward compatibility
-        if isinstance(password_setting, tuple):
-            password_type, password_value = password_setting
-        else:
-            # Legacy format - treat as DISABLE or PLAINTEXT
-            if password_setting == "DISABLE":
-                password_type, password_value = "DISABLE", None
-            else:
-                password_type, password_value = "PLAINTEXT", password_setting
-        
-        # Generate SQL for logging purposes
-        if password_type == "MD5":
-            sql = f"CREATE USER {username} PASSWORD '<md5hash>';"
-            logger.info(f"Password type: MD5 hash authentication")
-        elif password_type == "PLAINTEXT":
-            sql = f"CREATE USER {username} PASSWORD '<password>';"
-            logger.info(f"Password type: Static password authentication")
-        else:
+        if password_setting == "DISABLE":
             sql = f"CREATE USER {username} PASSWORD DISABLE;"
-            logger.info(f"Password type: Password disabled (IAM-only)")
+        else:
+            sql = f"CREATE USER {username} PASSWORD '{password_setting}';"
         
-        success, statement_id, error_or_info = redshift.create_user(username, password_type, password_value)
+        success, statement_id, error_or_info = redshift.create_user(username)
         result["statements"].append({
             "operation": "CREATE_USER",
             "statement_id": statement_id,

@@ -1,0 +1,32 @@
+# Code Backup Manifest
+# ====================
+# 
+# Backup Date: January 23, 2026 at 05:45:00 UTC
+# 
+# Purpose: Backing up code before implementing password authentication enhancement
+# 
+# Change Description:
+# -------------------
+# Expanding ServiceNow Incident Processor to support three Redshift user password methods:
+# 1. MD5 Hash Authentication - User provides pre-computed MD5 hash
+# 2. Static Password Authentication - User provides plaintext password  
+# 3. Password Disabled (existing) - IAM-only authentication
+#
+# Files Being Modified:
+# ---------------------
+# - process_servicenow_redshift.py
+#   - IncidentParser.extract_password_setting() - Enhanced to detect MD5/plaintext/disable patterns
+#   - RedshiftClient.create_user() - Updated to accept password type and value
+#   - IncidentProcessor._execute_create_user() - Updated to pass password info
+#
+# Backup Files:
+# -------------
+# - process_servicenow_redshift.py.backup_20260123_054500
+#
+# Rollback Instructions:
+# ----------------------
+# To rollback changes:
+#   cp backups/code_backups/process_servicenow_redshift.py.backup_20260123_054500 process_servicenow_redshift.py
+#
+# Related Incident: INC0010187
+# Session Documentation: docs/sessions/2026-01-23_INC0010187_REDSHIFT_USER_PROCESSING.md
