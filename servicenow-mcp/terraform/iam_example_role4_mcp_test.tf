@@ -1,0 +1,125 @@
+#############################################################################
+# Terraform Configuration for IAM Role: example_role4_mcp_test
+# 
+# BACKUP FILE - Created before deletion
+# This configuration can be used to recreate the IAM role with ARN:
+#   arn:aws:iam::175853813947:role/example_role4_mcp_test
+#
+# Role Details:
+#   - Name: example_role4_mcp_test
+#   - RoleId: AROASR4NUIC5QCD2764BR
+#   - Path: /
+#   - Max Session Duration: 3600 seconds
+#   - Attached Managed Policies: 1
+#   - Inline Policies: 0
+#   - Created: 2025-12-31T11:17:24+00:00
+#
+# Backup Generated: 2026-01-30 10:51:46
+#############################################################################
+
+terraform {
+  required_version = ">= 1.0.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 4.0.0"
+    }
+  }
+}
+
+#############################################################################
+# Provider Configuration
+#############################################################################
+# provider "aws" {
+#   region  = "us-east-1"
+#   profile = "default"
+# }
+
+#############################################################################
+# IAM Role: example_role4_mcp_test
+#############################################################################
+resource "aws_iam_role" "example_role4_mcp_test" {
+  name        = "example_role4_mcp_test"
+  path        = "/"
+  description = "IAM role for AWS Glue - Generated via AWS IAM MCP Server"
+
+  max_session_duration = 3600
+
+  assume_role_policy = jsonencode({
+      "Version": "2012-10-17",
+      "Statement": [
+          {
+              "Effect": "Allow",
+              "Principal": {
+                  "Service": "glue.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+          }
+      ]
+  })
+
+  tags = {
+    GeneratedBy = "AWS-IAM-MCP-Server"
+    GeneratedAt = "2025-12-31"
+  }
+}
+
+#############################################################################
+# IAM Policy: example_policy4_mcp_test
+# ARN: arn:aws:iam::175853813947:policy/example_policy4_mcp_test
+#############################################################################
+resource "aws_iam_policy" "example_policy4_mcp_test" {
+  name        = "example_policy4_mcp_test"
+  path        = "/"
+  description = "S3 access policy - Generated via AWS IAM MCP Server"
+
+  policy = jsonencode({
+      "Statement": [
+          {
+              "Action": [
+                  "s3:GetObject",
+                  "s3:PutObject"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                  "arn:aws:s3:::whizlabs12/sample_data.csv*"
+              ]
+          }
+      ],
+      "Version": "2012-10-17"
+  })
+
+  tags = {
+    GeneratedBy = "AWS-IAM-MCP-Server"
+    GeneratedAt = "2025-12-31"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "example_role4_mcp_test_example_policy4_mcp_test_attachment" {
+  role       = aws_iam_role.example_role4_mcp_test.name
+  policy_arn = aws_iam_policy.example_policy4_mcp_test.arn
+}
+
+#############################################################################
+# Outputs
+#############################################################################
+output "role_arn" {
+  description = "ARN of the IAM role"
+  value       = aws_iam_role.example_role4_mcp_test.arn
+}
+
+output "role_name" {
+  description = "Name of the IAM role"
+  value       = aws_iam_role.example_role4_mcp_test.name
+}
+
+output "role_id" {
+  description = "Unique ID of the IAM role"
+  value       = aws_iam_role.example_role4_mcp_test.unique_id
+}
+
+output "example_policy4_mcp_test_arn" {
+  description = "ARN of the example_policy4_mcp_test policy"
+  value       = aws_iam_policy.example_policy4_mcp_test.arn
+}

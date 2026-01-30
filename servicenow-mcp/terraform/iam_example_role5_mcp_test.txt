@@ -1,0 +1,148 @@
+#############################################################################
+# Terraform Configuration for IAM Role: example_role5_mcp_test
+# 
+# BACKUP FILE - Created before deletion
+# This configuration can be used to recreate the IAM role with ARN:
+#   arn:aws:iam::175853813947:role/example_role5_mcp_test
+#
+# Role Details:
+#   - Name: example_role5_mcp_test
+#   - RoleId: AROASR4NUIC5UFZ7CCLAT
+#   - Path: /
+#   - Max Session Duration: 3600 seconds (1 hour)
+#   - Trust Policy: Allows AWS Glue service to assume this role
+#   - Attached Managed Policy: example_policy5_mcp_test (custom policy for S3 access)
+#   - Inline Policies: None
+#   - Created: 2025-12-31T11:30:35+00:00
+#
+# Backup Generated: 2026-01-30
+#############################################################################
+
+terraform {
+  required_version = ">= 1.0.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 4.0.0"
+    }
+  }
+}
+
+#############################################################################
+# Provider Configuration
+# Uncomment and configure as needed for your environment
+#############################################################################
+# provider "aws" {
+#   region  = "us-east-1"
+#   profile = "default"
+# }
+
+#############################################################################
+# IAM Role: example_role5_mcp_test
+# 
+# This role is designed for AWS Glue service to assume.
+# It grants permissions for Glue jobs to access specific S3 resources.
+#############################################################################
+resource "aws_iam_role" "example_role5_mcp_test" {
+  name        = "example_role5_mcp_test"
+  path        = "/"
+  description = "IAM role for AWS Glue - Generated via AWS IAM MCP Server"
+
+  # Maximum session duration in seconds (1 hour)
+  max_session_duration = 3600
+
+  # Trust policy (assume role policy)
+  # Allows the AWS Glue service to assume this role
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "glue.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  # Tags from the original role
+  tags = {
+    GeneratedAt = "2025-12-31"
+    GeneratedBy = "AWS-IAM-MCP-Server"
+  }
+}
+
+#############################################################################
+# IAM Policy: example_policy5_mcp_test
+# 
+# Policy ID: ANPASR4NUIC523FXKERK7
+# Custom managed policy that grants S3 GetObject, PutObject, and ListBucket
+# permissions on a specific S3 bucket and object prefix.
+#############################################################################
+resource "aws_iam_policy" "example_policy5_mcp_test" {
+  name        = "example_policy5_mcp_test"
+  path        = "/"
+  description = "S3 access policy - Generated via AWS IAM MCP Server"
+
+  # Policy document with S3 permissions (version v2)
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::whizlabs12/sample_data.csv*"
+        ]
+      }
+    ]
+  })
+
+  # Tags from the original policy
+  tags = {
+    GeneratedBy = "AWS-IAM-MCP-Server"
+    GeneratedAt = "2025-12-31"
+  }
+}
+
+#############################################################################
+# IAM Role Policy Attachment
+# 
+# Attaches the example_policy5_mcp_test managed policy to the role.
+#############################################################################
+resource "aws_iam_role_policy_attachment" "example_role5_mcp_test_policy_attachment" {
+  role       = aws_iam_role.example_role5_mcp_test.name
+  policy_arn = aws_iam_policy.example_policy5_mcp_test.arn
+}
+
+#############################################################################
+# Outputs
+# 
+# Useful outputs for referencing this role in other Terraform configurations
+# or for verification purposes.
+#############################################################################
+output "role_arn" {
+  description = "ARN of the IAM role"
+  value       = aws_iam_role.example_role5_mcp_test.arn
+}
+
+output "role_name" {
+  description = "Name of the IAM role"
+  value       = aws_iam_role.example_role5_mcp_test.name
+}
+
+output "role_id" {
+  description = "Unique ID of the IAM role"
+  value       = aws_iam_role.example_role5_mcp_test.unique_id
+}
+
+output "policy_arn" {
+  description = "ARN of the IAM policy"
+  value       = aws_iam_policy.example_policy5_mcp_test.arn
+}
