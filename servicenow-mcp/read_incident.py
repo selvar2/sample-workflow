@@ -20,6 +20,12 @@ username = os.getenv("SERVICENOW_USERNAME")
 password = os.getenv("SERVICENOW_PASSWORD")
 auth_type = os.getenv("SERVICENOW_AUTH_TYPE", "basic")
 
+# OAuth configuration
+client_id = os.getenv("SERVICENOW_CLIENT_ID")
+client_secret = os.getenv("SERVICENOW_CLIENT_SECRET")
+token_url = os.getenv("SERVICENOW_TOKEN_URL")
+grant_type = os.getenv("SERVICENOW_OAUTH_GRANT_TYPE", "password")
+
 if not instance_url or not username or not password:
     print("Error: Missing required environment variables.")
     print("Please set SERVICENOW_INSTANCE_URL, SERVICENOW_USERNAME, and SERVICENOW_PASSWORD.")
@@ -36,6 +42,17 @@ config_dict = {
         }
     }
 }
+
+# Add OAuth config if using OAuth
+if auth_type == "oauth" and client_id and client_secret:
+    config_dict["auth"]["oauth"] = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "token_url": token_url or f"{instance_url}/oauth_token.do",
+        "username": username,
+        "password": password,
+        "grant_type": grant_type
+    }
 
 config = ServerConfig(**config_dict)
 auth_manager = AuthManager(config.auth, config.instance_url)

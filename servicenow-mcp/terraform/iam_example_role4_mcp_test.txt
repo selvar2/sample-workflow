@@ -7,18 +7,18 @@
 #
 # Role Details:
 #   - Name: example_role4_mcp_test
-#   - RoleId: AROASR4NUIC5UNZ6TZMX7
+#   - RoleId: AROASR4NUIC56ZEHY6NWI
 #   - Path: /
 #   - Max Session Duration: 3600 seconds
 #   - Attached Managed Policies: 1
 #   - Inline Policies: 0
-#   - Created: 2026-01-30T10:58:54+00:00
+#   - Created: 2026-01-30T11:21:43+00:00
 #
 # MCP Servers Used:
 #   - awslabs.iam-mcp-server (for role information)
 #   - awslabs.terraform-mcp-server (for restore operations)
 #
-# Backup Generated: 2026-01-30 11:19:42
+# Backup Generated: 2026-01-30 12:19:54
 #############################################################################
 
 terraform {
@@ -64,8 +64,8 @@ resource "aws_iam_role" "example_role4_mcp_test" {
   })
 
   tags = {
-    GeneratedAt = "2025-12-31"
     GeneratedBy = "AWS-IAM-MCP-Server"
+    GeneratedAt = "2025-12-31"
   }
 }
 

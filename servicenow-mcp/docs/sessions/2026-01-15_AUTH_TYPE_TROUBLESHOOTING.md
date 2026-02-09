@@ -1,4 +1,5 @@
 # ServiceNow MCP - Authentication Configuration Session
+
 ## Date: January 15, 2026
 
 ---
@@ -24,15 +25,18 @@ This document covers the troubleshooting session for configuring `SERVICENOW_AUT
 ## Initial Problem
 
 ### Symptom
+
 The application failed to start with a Pydantic `ValidationError` when `SERVICENOW_AUTH_TYPE` was set to an invalid value.
 
 ### Initial Incorrect Configuration
+
 ```bash
 # Codespaces Secret - INCORRECT
 SERVICENOW_AUTH_TYPE=basic,oauth
 ```
 
 ### Error Message
+
 ```
 pydantic_core._pydantic_core.ValidationError: 1 validation error for ServerConfig
 auth.type
@@ -44,13 +48,15 @@ auth.type
 ## Error Analysis
 
 ### Root Cause
+
 The `SERVICENOW_AUTH_TYPE` environment variable expects a **single value**, not comma-separated values. The application uses Pydantic for configuration validation, which enforces strict enum types.
 
 ### Invalid Values Attempted
-| Value | Result |
-|-------|--------|
+
+| Value         | Result                                |
+| ------------- | ------------------------------------- |
 | `basic,oauth` | ❌ ValidationError - not a valid enum |
-| `both` | ❌ ValidationError - not a valid enum |
+| `both`        | ❌ ValidationError - not a valid enum |
 | `oauth,basic` | ❌ ValidationError - not a valid enum |
 
 ---
@@ -59,36 +65,40 @@ The `SERVICENOW_AUTH_TYPE` environment variable expects a **single value**, not 
 
 The application supports **four** authentication types:
 
-| Auth Type | Description | Required Environment Variables |
-|-----------|-------------|-------------------------------|
-| `basic` | Basic username/password authentication | `SERVICENOW_USERNAME`, `SERVICENOW_PASSWORD` |
-| `oauth` | OAuth 2.0 client credentials | `SERVICENOW_CLIENT_ID`, `SERVICENOW_CLIENT_SECRET` |
-| `api_key` | API key authentication | `SERVICENOW_API_KEY` |
-| `oauth_with_basic_fallback` | OAuth with automatic Basic auth fallback | All OAuth + Basic credentials |
+| Auth Type                   | Description                              | Required Environment Variables                     |
+| --------------------------- | ---------------------------------------- | -------------------------------------------------- |
+| `basic`                     | Basic username/password authentication   | `SERVICENOW_USERNAME`, `SERVICENOW_PASSWORD`       |
+| `oauth`                     | OAuth 2.0 client credentials             | `SERVICENOW_CLIENT_ID`, `SERVICENOW_CLIENT_SECRET` |
+| `api_key`                   | API key authentication                   | `SERVICENOW_API_KEY`                               |
+| `oauth_with_basic_fallback` | OAuth with automatic Basic auth fallback | All OAuth + Basic credentials                      |
 
 ---
 
 ## Solution: oauth_with_basic_fallback
 
 ### Description
+
 The `oauth_with_basic_fallback` authentication type provides the best of both worlds:
 
 1. **Primary**: Attempts OAuth authentication first
 2. **Fallback**: If OAuth fails (token expired, invalid credentials, etc.), automatically falls back to Basic authentication
 
 ### Benefits
+
 - OAuth security as primary method
 - Basic auth reliability as backup
 - Seamless failover without manual intervention
 - No downtime during token refresh issues
 
 ### Configuration
+
 ```bash
 # Codespaces Secret - CORRECT
 SERVICENOW_AUTH_TYPE=oauth_with_basic_fallback
 ```
 
 ### Required Environment Variables
+
 ```bash
 # OAuth credentials (primary)
 SERVICENOW_CLIENT_ID=your_client_id
@@ -107,12 +117,14 @@ SERVICENOW_INSTANCE_URL=https://your-instance.service-now.com
 ## Terminal Commands and Outputs
 
 ### 1. Finding app.py Location
+
 ```bash
 $ find /workspaces/sample-workflow/servicenow-mcp -name "app.py" 2>/dev/null
 /workspaces/sample-workflow/servicenow-mcp/web_ui/app.py
 ```
 
 ### 2. Checking Current Auth Type
+
 ```bash
 $ cd /workspaces/sample-workflow/servicenow-mcp && source .venv/bin/activate && python -c "import os; print('AUTH_TYPE:', os.getenv('SERVICENOW_AUTH_TYPE', 'not set'))"
 
@@ -120,18 +132,20 @@ AUTH_TYPE: oauth_with_basic_fallback
 ```
 
 ### 3. Restarting the Application
+
 ```bash
 $ cd /workspaces/sample-workflow/servicenow-mcp && pkill -f "python.*app.py" 2>/dev/null; sleep 1; source .venv/bin/activate && python web_ui/app.py
 ```
 
 ### 4. Successful Startup Output
+
 ```
 Database initialized at: /workspaces/sample-workflow/servicenow-mcp/web_ui/auth.db
 ======================================================================
 ServiceNow Incident Processor - Web UI
 ======================================================================
 Starting server on http://localhost:5000
-ServiceNow Instance: https://dev282453.service-now.com
+ServiceNow Instance: https://dev352467.service-now.com
 AWS Region: us-east-1
 Dry Run Mode: False
 ----------------------------------------------------------------------
@@ -148,6 +162,7 @@ Press CTRL+C to quit
 ```
 
 ### 5. Searching for Auth Type Usage in Codebase
+
 ```bash
 $ grep -r "SERVICENOW_AUTH_TYPE" --include="*.py" /workspaces/sample-workflow/servicenow-mcp/
 
@@ -164,16 +179,17 @@ $ grep -r "SERVICENOW_AUTH_TYPE" --include="*.py" /workspaces/sample-workflow/se
 
 Navigate to: **Settings → Codespaces → Secrets → Update secret**
 
-| Secret Name | Value |
-|-------------|-------|
-| `SERVICENOW_AUTH_TYPE` | `oauth_with_basic_fallback` |
-| `SERVICENOW_INSTANCE_URL` | `https://your-instance.service-now.com` |
-| `SERVICENOW_USERNAME` | `your_username` |
-| `SERVICENOW_PASSWORD` | `your_password` |
-| `SERVICENOW_CLIENT_ID` | `your_oauth_client_id` |
-| `SERVICENOW_CLIENT_SECRET` | `your_oauth_client_secret` |
+| Secret Name                | Value                                   |
+| -------------------------- | --------------------------------------- |
+| `SERVICENOW_AUTH_TYPE`     | `oauth_with_basic_fallback`             |
+| `SERVICENOW_INSTANCE_URL`  | `https://your-instance.service-now.com` |
+| `SERVICENOW_USERNAME`      | `your_username`                         |
+| `SERVICENOW_PASSWORD`      | `your_password`                         |
+| `SERVICENOW_CLIENT_ID`     | `your_oauth_client_id`                  |
+| `SERVICENOW_CLIENT_SECRET` | `your_oauth_client_secret`              |
 
 ### Local .env File Configuration
+
 ```bash
 # /workspaces/sample-workflow/servicenow-mcp/.env
 
@@ -199,6 +215,7 @@ SERVICENOW_CLIENT_SECRET=your_client_secret
 ### Error: ValidationError for auth.type
 
 **Symptom:**
+
 ```
 pydantic_core._pydantic_core.ValidationError: 1 validation error for ServerConfig
 auth.type
@@ -207,6 +224,7 @@ auth.type
 
 **Solution:**
 Set `SERVICENOW_AUTH_TYPE` to one of the valid values:
+
 - `basic`
 - `oauth`
 - `api_key`
@@ -217,6 +235,7 @@ Set `SERVICENOW_AUTH_TYPE` to one of the valid values:
 ### Error: OAuth Token Expired
 
 **Symptom:**
+
 ```
 OAuth authentication failed: Token expired
 ```
@@ -225,6 +244,7 @@ OAuth authentication failed: Token expired
 The system automatically falls back to Basic auth. No manual intervention required.
 
 **Solution with oauth only:**
+
 1. Refresh the OAuth token
 2. Or change `SERVICENOW_AUTH_TYPE` to `oauth_with_basic_fallback`
 
@@ -233,6 +253,7 @@ The system automatically falls back to Basic auth. No manual intervention requir
 ### Error: Missing Credentials
 
 **Symptom:**
+
 ```
 ServiceNow authentication failed: Missing credentials
 ```
@@ -240,12 +261,12 @@ ServiceNow authentication failed: Missing credentials
 **Solution:**
 Ensure all required environment variables are set for your auth type:
 
-| Auth Type | Required Variables |
-|-----------|-------------------|
-| `basic` | `SERVICENOW_USERNAME`, `SERVICENOW_PASSWORD` |
-| `oauth` | `SERVICENOW_CLIENT_ID`, `SERVICENOW_CLIENT_SECRET` |
-| `api_key` | `SERVICENOW_API_KEY` |
-| `oauth_with_basic_fallback` | All OAuth + Basic credentials |
+| Auth Type                   | Required Variables                                 |
+| --------------------------- | -------------------------------------------------- |
+| `basic`                     | `SERVICENOW_USERNAME`, `SERVICENOW_PASSWORD`       |
+| `oauth`                     | `SERVICENOW_CLIENT_ID`, `SERVICENOW_CLIENT_SECRET` |
+| `api_key`                   | `SERVICENOW_API_KEY`                               |
+| `oauth_with_basic_fallback` | All OAuth + Basic credentials                      |
 
 ---
 
@@ -255,12 +276,15 @@ Ensure all required environment variables are set for your auth type:
 Application hangs or doesn't respond on port 5000.
 
 **Solution:**
+
 1. Kill existing processes:
+
    ```bash
    pkill -f "python.*app.py"
    ```
 
 2. Wait and restart:
+
    ```bash
    sleep 1
    source .venv/bin/activate
@@ -317,22 +341,22 @@ Application hangs or doesn't respond on port 5000.
 
 ## Files Modified/Referenced
 
-| File | Purpose |
-|------|---------|
-| `src/servicenow_mcp/utils/config.py` | Auth configuration and enum types |
+| File                                      | Purpose                            |
+| ----------------------------------------- | ---------------------------------- |
+| `src/servicenow_mcp/utils/config.py`      | Auth configuration and enum types  |
 | `src/servicenow_mcp/auth/auth_manager.py` | Authentication logic with fallback |
-| `src/servicenow_mcp/cli.py` | CLI argument parsing for auth type |
-| `web_ui/app.py` | Flask application entry point |
+| `src/servicenow_mcp/cli.py`               | CLI argument parsing for auth type |
+| `web_ui/app.py`                           | Flask application entry point      |
 
 ---
 
 ## Summary
 
-| Item | Before | After |
-|------|--------|-------|
-| Auth Type Value | `basic,oauth` (invalid) | `oauth_with_basic_fallback` (valid) |
-| Application Status | ❌ ValidationError | ✅ Running |
-| Authentication | Single method | OAuth + Basic fallback |
+| Item               | Before                  | After                               |
+| ------------------ | ----------------------- | ----------------------------------- |
+| Auth Type Value    | `basic,oauth` (invalid) | `oauth_with_basic_fallback` (valid) |
+| Application Status | ❌ ValidationError      | ✅ Running                          |
+| Authentication     | Single method           | OAuth + Basic fallback              |
 
 ---
 
@@ -344,5 +368,5 @@ Application hangs or doesn't respond on port 5000.
 
 ---
 
-*Document generated: January 15, 2026*
-*Session conducted in GitHub Codespaces on branch: workflowag5*
+_Document generated: January 15, 2026_
+_Session conducted in GitHub Codespaces on branch: workflowag5_

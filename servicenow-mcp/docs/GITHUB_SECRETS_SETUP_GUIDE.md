@@ -8,12 +8,12 @@ GitHub Codespaces secrets allow you to store sensitive credentials securely with
 
 ## Benefits of Using GitHub Secrets
 
-| Aspect | Hardcoded .env | GitHub Secrets |
-|--------|---------------|----------------|
-| **Security** | ❌ Risk of exposure | ✅ Encrypted at rest |
-| **Version Control** | ❌ May be committed | ✅ Never in repo |
-| **Rotation** | ❌ Manual file updates | ✅ Update in one place |
-| **Team Sharing** | ❌ Share files manually | ✅ Automatic for collaborators |
+| Aspect              | Hardcoded .env          | GitHub Secrets                 |
+| ------------------- | ----------------------- | ------------------------------ |
+| **Security**        | ❌ Risk of exposure     | ✅ Encrypted at rest           |
+| **Version Control** | ❌ May be committed     | ✅ Never in repo               |
+| **Rotation**        | ❌ Manual file updates  | ✅ Update in one place         |
+| **Team Sharing**    | ❌ Share files manually | ✅ Automatic for collaborators |
 
 ---
 
@@ -34,6 +34,7 @@ GitHub Codespaces secrets allow you to store sensitive credentials securely with
 5. Scroll to **Codespaces secrets** section
 
 **Direct URL:**
+
 ```
 https://github.com/settings/codespaces
 ```
@@ -44,28 +45,28 @@ https://github.com/settings/codespaces
 
 ### Core Secrets (Required for All Auth Types)
 
-| Secret Name | Description | Example Value |
-|-------------|-------------|---------------|
-| `SERVICENOW_INSTANCE_URL` | Your ServiceNow instance URL | `https://dev282453.service-now.com` |
-| `SERVICENOW_AUTH_TYPE` | Authentication method | `basic` or `oauth` |
+| Secret Name               | Description                  | Example Value                       |
+| ------------------------- | ---------------------------- | ----------------------------------- |
+| `SERVICENOW_INSTANCE_URL` | Your ServiceNow instance URL | `https://dev352467.service-now.com` |
+| `SERVICENOW_AUTH_TYPE`    | Authentication method        | `basic` or `oauth`                  |
 
 ### Basic Authentication Secrets
 
-| Secret Name | Description | Example Value |
-|-------------|-------------|---------------|
-| `SERVICENOW_USERNAME` | ServiceNow username | `admin` |
+| Secret Name           | Description         | Example Value   |
+| --------------------- | ------------------- | --------------- |
+| `SERVICENOW_USERNAME` | ServiceNow username | `admin`         |
 | `SERVICENOW_PASSWORD` | ServiceNow password | `your-password` |
 
 ### OAuth Authentication Secrets
 
-| Secret Name | Description | Example Value |
-|-------------|-------------|---------------|
-| `SERVICENOW_CLIENT_ID` | OAuth Client ID | `0cb82d91d35e486499fe3b276c8a33f0` |
-| `SERVICENOW_CLIENT_SECRET` | OAuth Client Secret | `your-client-secret` |
-| `SERVICENOW_TOKEN_URL` | OAuth Token Endpoint | `https://instance.service-now.com/oauth_token.do` |
-| `SERVICENOW_OAUTH_GRANT_TYPE` | Grant type | `password` or `client_credentials` |
-| `SERVICENOW_USERNAME` | User for password grant | `admin` |
-| `SERVICENOW_PASSWORD` | Password for password grant | `your-password` |
+| Secret Name                   | Description                 | Example Value                                     |
+| ----------------------------- | --------------------------- | ------------------------------------------------- |
+| `SERVICENOW_CLIENT_ID`        | OAuth Client ID             | `0cb82d91d35e486499fe3b276c8a33f0`                |
+| `SERVICENOW_CLIENT_SECRET`    | OAuth Client Secret         | `your-client-secret`                              |
+| `SERVICENOW_TOKEN_URL`        | OAuth Token Endpoint        | `https://instance.service-now.com/oauth_token.do` |
+| `SERVICENOW_OAUTH_GRANT_TYPE` | Grant type                  | `password` or `client_credentials`                |
+| `SERVICENOW_USERNAME`         | User for password grant     | `admin`                                           |
+| `SERVICENOW_PASSWORD`         | Password for password grant | `your-password`                                   |
 
 ---
 
@@ -76,38 +77,48 @@ https://github.com/settings/codespaces
 Click **"New secret"** for each of the following:
 
 #### Secret 1: SERVICENOW_AUTH_TYPE
+
 ```
 Name:  SERVICENOW_AUTH_TYPE
 Value: oauth
 ```
+
 Select repository: `your-username/sample-workflow`
 
 #### Secret 2: SERVICENOW_CLIENT_ID
+
 ```
 Name:  SERVICENOW_CLIENT_ID
 Value: <your-client-id-from-servicenow>
 ```
+
 Select repository: `your-username/sample-workflow`
 
 #### Secret 3: SERVICENOW_CLIENT_SECRET
+
 ```
 Name:  SERVICENOW_CLIENT_SECRET
 Value: <your-client-secret-from-servicenow>
 ```
+
 Select repository: `your-username/sample-workflow`
 
 #### Secret 4: SERVICENOW_TOKEN_URL
+
 ```
 Name:  SERVICENOW_TOKEN_URL
 Value: https://<your-instance>.service-now.com/oauth_token.do
 ```
+
 Select repository: `your-username/sample-workflow`
 
 #### Secret 5: SERVICENOW_OAUTH_GRANT_TYPE
+
 ```
 Name:  SERVICENOW_OAUTH_GRANT_TYPE
 Value: password
 ```
+
 Select repository: `your-username/sample-workflow`
 
 > **Note:** For `password` grant, you also need `SERVICENOW_USERNAME` and `SERVICENOW_PASSWORD` secrets.
@@ -131,15 +142,18 @@ For each secret, ensure you grant access to the correct repository:
 **Important:** After adding or modifying secrets, you must rebuild your Codespace:
 
 ### Option A: Via Command Palette
+
 1. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
 2. Type: `Codespaces: Rebuild Container`
 3. Select it and confirm
 
 ### Option B: Via Codespace Menu
+
 1. Click the **Codespaces** menu (bottom-left corner)
 2. Select **Rebuild Container**
 
 ### Option C: Full Rebuild (if issues persist)
+
 1. Press `Ctrl+Shift+P`
 2. Type: `Codespaces: Full Rebuild Container`
 3. This clears cache and rebuilds from scratch
@@ -173,6 +187,7 @@ python test_oauth_auth.py
 ```
 
 Expected output:
+
 ```
 ============================================================
 ServiceNow OAuth Authentication Test
@@ -185,11 +200,13 @@ ServiceNow OAuth Authentication Test
 ### Test Basic Authentication
 
 First, update the secret:
+
 ```
 SERVICENOW_AUTH_TYPE=basic
 ```
 
 Then rebuild Codespace and test:
+
 ```bash
 python -c "
 from servicenow_mcp.auth.auth_manager import AuthManager
@@ -215,25 +232,25 @@ print('✅ Basic Auth configured successfully')
 
 ### For OAuth (Recommended)
 
-| Secret | Value |
-|--------|-------|
-| `SERVICENOW_INSTANCE_URL` | `https://your-instance.service-now.com` |
-| `SERVICENOW_AUTH_TYPE` | `oauth` |
-| `SERVICENOW_CLIENT_ID` | `your-client-id` |
-| `SERVICENOW_CLIENT_SECRET` | `your-client-secret` |
-| `SERVICENOW_TOKEN_URL` | `https://your-instance.service-now.com/oauth_token.do` |
-| `SERVICENOW_OAUTH_GRANT_TYPE` | `password` |
-| `SERVICENOW_USERNAME` | `admin` |
-| `SERVICENOW_PASSWORD` | `your-password` |
+| Secret                        | Value                                                  |
+| ----------------------------- | ------------------------------------------------------ |
+| `SERVICENOW_INSTANCE_URL`     | `https://your-instance.service-now.com`                |
+| `SERVICENOW_AUTH_TYPE`        | `oauth`                                                |
+| `SERVICENOW_CLIENT_ID`        | `your-client-id`                                       |
+| `SERVICENOW_CLIENT_SECRET`    | `your-client-secret`                                   |
+| `SERVICENOW_TOKEN_URL`        | `https://your-instance.service-now.com/oauth_token.do` |
+| `SERVICENOW_OAUTH_GRANT_TYPE` | `password`                                             |
+| `SERVICENOW_USERNAME`         | `admin`                                                |
+| `SERVICENOW_PASSWORD`         | `your-password`                                        |
 
 ### For Basic Auth
 
-| Secret | Value |
-|--------|-------|
+| Secret                    | Value                                   |
+| ------------------------- | --------------------------------------- |
 | `SERVICENOW_INSTANCE_URL` | `https://your-instance.service-now.com` |
-| `SERVICENOW_AUTH_TYPE` | `basic` |
-| `SERVICENOW_USERNAME` | `admin` |
-| `SERVICENOW_PASSWORD` | `your-password` |
+| `SERVICENOW_AUTH_TYPE`    | `basic`                                 |
+| `SERVICENOW_USERNAME`     | `admin`                                 |
+| `SERVICENOW_PASSWORD`     | `your-password`                         |
 
 ---
 
@@ -256,6 +273,7 @@ To switch between Basic and OAuth authentication:
 **Symptom:** Environment variables are empty after rebuild
 
 **Solutions:**
+
 1. Verify repository access is granted for each secret
 2. Ensure Codespace was rebuilt (not just restarted)
 3. Try a full rebuild: `Codespaces: Full Rebuild Container`
@@ -265,6 +283,7 @@ To switch between Basic and OAuth authentication:
 **Symptom:** `401 Unauthorized` or `invalid_client` error
 
 **Solutions:**
+
 1. Verify `SERVICENOW_CLIENT_ID` and `SERVICENOW_CLIENT_SECRET` are correct
 2. Check the OAuth application is **Active** in ServiceNow
 3. Ensure `SERVICENOW_TOKEN_URL` uses the correct instance name
@@ -272,6 +291,7 @@ To switch between Basic and OAuth authentication:
 ### Environment Variable Precedence
 
 **Order of precedence (highest to lowest):**
+
 1. Command-line arguments
 2. GitHub Codespaces secrets (environment variables)
 3. Local `.env` file (if exists)
@@ -292,21 +312,25 @@ To switch between Basic and OAuth authentication:
 ## Quick Reference
 
 ### Add a New Secret
+
 ```
 GitHub → Settings → Codespaces → Secrets → New secret
 ```
 
 ### Rebuild Codespace
+
 ```
 Ctrl+Shift+P → Codespaces: Rebuild Container
 ```
 
 ### Test OAuth
+
 ```bash
 python test_oauth_auth.py
 ```
 
 ### Check Environment
+
 ```bash
 env | grep SERVICENOW
 ```

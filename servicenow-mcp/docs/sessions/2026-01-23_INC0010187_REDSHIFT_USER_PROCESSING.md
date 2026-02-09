@@ -718,7 +718,7 @@ python test_redshift_password_connection.py --user user31 --password "your_passw
 
 ## 9. References
 
-- **ServiceNow Instance:** https://dev282453.service-now.com
+- **ServiceNow Instance:** https://dev352467.service-now.com
 - **Redshift Cluster:** redshift-cluster-1.cqtkvymdarzl.us-east-1.redshift.amazonaws.com
 - **AWS Region:** us-east-1
 - **Database:** dev

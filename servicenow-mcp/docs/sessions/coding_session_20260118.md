@@ -40,7 +40,7 @@
 | **OS**                  | Debian GNU/Linux 11 (bullseye) - Dev Container     |
 | **Python Version**      | 3.12                                               |
 | **Virtual Environment** | `/workspaces/sample-workflow/servicenow-mcp/.venv` |
-| **ServiceNow Instance** | https://dev282453.service-now.com                  |
+| **ServiceNow Instance** | https://dev352467.service-now.com                  |
 | **AWS Region**          | us-east-1                                          |
 | **Redshift Cluster**    | redshift-cluster-1                                 |
 | **Redshift Database**   | dev                                                |
@@ -358,7 +358,7 @@ Database initialized at: /workspaces/sample-workflow/servicenow-mcp/web_ui/auth.
 ServiceNow Incident Processor - Web UI
 ======================================================================
 Starting server on http://localhost:5000
-ServiceNow Instance: https://dev282453.service-now.com
+ServiceNow Instance: https://dev352467.service-now.com
 AWS Region: us-east-1
 Dry Run Mode: False
 ----------------------------------------------------------------------

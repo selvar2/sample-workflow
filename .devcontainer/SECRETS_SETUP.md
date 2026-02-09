@@ -16,7 +16,7 @@ Click **New repository secret** and add the following secrets:
 ### ServiceNow Secrets
 
 1. **SERVICENOW_INSTANCE_URL**
-   - Value: `https://dev282453.service-now.com` (your instance URL)
+   - Value: `https://dev352467.service-now.com` (your instance URL)
 
 2. **SERVICENOW_USERNAME**
    - Value: `admin` (your ServiceNow username)
@@ -80,7 +80,7 @@ If you're running locally (not in Codespaces), you can use a `.env` file:
 ```bash
 cd /workspaces/sample-workflow/servicenow-mcp
 cat > .env << EOF
-SERVICENOW_INSTANCE_URL=https://dev282453.service-now.com
+SERVICENOW_INSTANCE_URL=https://dev352467.service-now.com
 SERVICENOW_USERNAME=admin
 SERVICENOW_PASSWORD=your-password
 AWS_ACCESS_KEY_ID=your-access-key
@@ -94,14 +94,17 @@ EOF
 ## Troubleshooting
 
 ### Secrets Not Available
+
 - Make sure you've added them in **Codespaces** section, not **Actions** secrets
 - Rebuild the container after adding secrets
 
 ### AWS Credentials Not Working
+
 - Verify the access key and secret key are correct
 - Check that your AWS user has the necessary permissions for Redshift
 
 ### ServiceNow Connection Fails
+
 - Verify the instance URL is correct (include `https://`)
 - Check that your username and password are correct
 - Ensure your ServiceNow instance is accessible
